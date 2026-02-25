@@ -35,6 +35,27 @@ function pickMenuImage() {
   return fs.existsSync(imagePath) ? imagePath : null;
 }
 
+// Mobile-friendly 2-column list + pagination
+function renderTwoCols(items, prefix, page = 1, perPage = 24) {
+  const clean = items.map(x => `${prefix}${x}`);
+  const totalPages = Math.max(1, Math.ceil(clean.length / perPage));
+  const p = Math.min(Math.max(1, page), totalPages);
+
+  const start = (p - 1) * perPage;
+  const slice = clean.slice(start, start + perPage);
+
+  const colW = 14; // keep small for mobile
+  let out = '';
+
+  for (let i = 0; i < slice.length; i += 2) {
+    const a = (slice[i] || '').padEnd(colW, ' ');
+    const b = (slice[i + 1] || '');
+    out += `• ${a}  ${b}\n`;
+  }
+
+  return { out: out.trimEnd(), page: p, totalPages };
+}
+
 module.exports = {
   name: 'menu',
   aliases: [
@@ -45,7 +66,7 @@ module.exports = {
     'animemenu', 'toolsmenu'
   ],
   category: 'general',
-  description: 'Show menu + submenus',
+  description: 'Show menu + submenus (mobile friendly)',
   usage: '.menu',
 
   async execute(sock, msg, args = [], extra = {}) {
@@ -53,7 +74,8 @@ module.exports = {
     const sender = extra?.sender || msg?.key?.participant || chatId;
 
     const prefix = config.prefix || '.';
-    const botName = String(config.botName || 'INFINITY MD');
+    const botName = String(config.botName || 'Infinity MD');
+    const botTitle = botName.toUpperCase();
 
     // Load commands grouped by category
     const commands = loadCommands();
@@ -74,46 +96,44 @@ module.exports = {
       categories[cat].push(cmd);
     }
 
+    // Stats
     const ownerNames = Array.isArray(config.ownerName) ? config.ownerName : [config.ownerName];
     const owner = ownerNames?.[0] || 'Infinity Team';
     const uptime = formatUptime(process.uptime());
     const ram = (process.memoryUsage().rss / 1024 / 1024).toFixed(2);
     const who = mentionTag(sender);
 
-    // detect submenu from ".menu admin" OR ".adminmenu"
+    // Detect submenu from ".menu admin" OR ".adminmenu"
     const usedCommand = String(extra?.commandName || '').toLowerCase();
     const subMenu =
       (args[0] && String(args[0]).toLowerCase()) ||
       (usedCommand.endsWith('menu') ? usedCommand : null);
 
-    // ------- MAIN MENU -------
+    // ---------------- MAIN MENU (MOBILE FRIENDLY) ----------------
     if (!subMenu || subMenu === 'menu') {
+      // keep each line short (fits mobile)
       const menuTextRaw =
-`╔══════════════════════╗
-║  🤖 ${botName.toUpperCase()}
-╠══════════════════════╣
-║ 👋 User    : ${who}
-║ 👑 Owner   : ${owner}
-║ ⚡ Prefix  : ${prefix}
-║ 📦 Cmds    : ${seen.size}
-║ ⏱ Uptime  : ${uptime}
-║ 🧠 RAM     : ${ram} MB
-╚══════════════════════╝
+`${botTitle}
+Hi ${who}
 
-╭─────── MENU LIST ───────╮
-│ 🧭 ${prefix}generalmenu
-│ 🤖 ${prefix}aimenu
-│ 🛡️ ${prefix}adminmenu
-│ 👑 ${prefix}ownermenu
-│ 🎞️ ${prefix}dlmenu
-│ 🎭 ${prefix}funmenu
-│ 🔧 ${prefix}toolmenu
-│ 👾 ${prefix}entertainmentmenu
-│ 🖋 ${prefix}textmenu
-│ 🎬 ${prefix}moviemenu
-╰─────────────────────────╯
+⚡ ${prefix} | 📦 ${seen.size} cmds
+⏱ ${uptime} | 🧠 ${ram}MB
+👑 ${owner}
 
-📜 Full Commands: ${prefix}mainmenu`;
+MENUS
+1) ${prefix}generalmenu
+2) ${prefix}aimenu
+3) ${prefix}adminmenu
+4) ${prefix}ownermenu
+5) ${prefix}dlmenu
+6) ${prefix}funmenu
+7) ${prefix}toolmenu
+8) ${prefix}entertainmentmenu
+9) ${prefix}textmenu
+10) ${prefix}moviemenu
+
+📜 Full: ${prefix}mainmenu
+Tip: ${prefix}menu admin 2`;
 
       const caption = mono(menuTextRaw);
 
@@ -159,69 +179,67 @@ module.exports = {
       );
     }
 
-    // ------- SUBMENUS -------
+    // ---------------- SUBMENUS (MODERN + SMALL + PAGINATED) ----------------
     let category = '';
     let title = '';
 
     switch (subMenu) {
-      case 'generalmenu':       category = 'general';       title = '🧭 GENERAL COMMANDS'; break;
-      case 'aimenu':            category = 'ai';            title = '🤖 AI COMMANDS'; break;
-      case 'adminmenu':         category = 'admin';         title = '🛡️ ADMIN COMMANDS'; break;
-      case 'ownermenu':         category = 'owner';         title = '👑 OWNER COMMANDS'; break;
-      case 'dlmenu':            category = 'media';         title = '🎞️ MEDIA COMMANDS'; break;
-      case 'funmenu':           category = 'fun';           title = '🎭 FUN COMMANDS'; break;
-      case 'toolmenu':          category = 'utility';       title = '🔧 UTILITY COMMANDS'; break;
-      case 'entertainmentmenu': category = 'entertainment'; title = '👾 ENTERTAINMENT COMMANDS'; break;
-      case 'textmenu':          category = 'textmaker';     title = '🖋️ TEXTMAKER COMMANDS'; break;
-      case 'moviemenu':         category = 'movies';        title = '🎬 MOVIES COMMANDS'; break;
+      case 'generalmenu':       category = 'general';       title = 'General'; break;
+      case 'aimenu':            category = 'ai';            title = 'AI'; break;
+      case 'adminmenu':         category = 'admin';         title = 'Admin'; break;
+      case 'ownermenu':         category = 'owner';         title = 'Owner'; break;
+      case 'dlmenu':            category = 'media';         title = 'Media'; break;
+      case 'funmenu':           category = 'fun';           title = 'Fun'; break;
+      case 'toolmenu':          category = 'utility';       title = 'Tools'; break;
+      case 'entertainmentmenu': category = 'entertainment'; title = 'Entertainment'; break;
+      case 'textmenu':          category = 'textmaker';     title = 'TextMaker'; break;
+      case 'moviemenu':         category = 'movies';        title = 'Movies'; break;
 
-      // allow ".menu admin" style
-      case 'general':           category = 'general';       title = '🧭 GENERAL COMMANDS'; break;
-      case 'ai':                category = 'ai';            title = '🤖 AI COMMANDS'; break;
-      case 'admin':             category = 'admin';         title = '🛡️ ADMIN COMMANDS'; break;
-      case 'owner':             category = 'owner';         title = '👑 OWNER COMMANDS'; break;
-      case 'media':             category = 'media';         title = '🎞️ MEDIA COMMANDS'; break;
-      case 'fun':               category = 'fun';           title = '🎭 FUN COMMANDS'; break;
-      case 'utility':           category = 'utility';       title = '🔧 UTILITY COMMANDS'; break;
-      case 'entertainment':     category = 'entertainment'; title = '👾 ENTERTAINMENT COMMANDS'; break;
-      case 'textmaker':         category = 'textmaker';     title = '🖋️ TEXTMAKER COMMANDS'; break;
-      case 'movies':            category = 'movies';        title = '🎬 MOVIES COMMANDS'; break;
+      // ".menu admin" style
+      case 'general':           category = 'general';       title = 'General'; break;
+      case 'ai':                category = 'ai';            title = 'AI'; break;
+      case 'admin':             category = 'admin';         title = 'Admin'; break;
+      case 'owner':             category = 'owner';         title = 'Owner'; break;
+      case 'media':             category = 'media';         title = 'Media'; break;
+      case 'fun':               category = 'fun';           title = 'Fun'; break;
+      case 'utility':           category = 'utility';       title = 'Tools'; break;
+      case 'entertainment':     category = 'entertainment'; title = 'Entertainment'; break;
+      case 'textmaker':         category = 'textmaker';     title = 'TextMaker'; break;
+      case 'movies':            category = 'movies';        title = 'Movies'; break;
 
       // back-compat
-      case 'animemenu':         category = 'entertainment'; title = '👾 ENTERTAINMENT COMMANDS'; break;
-      case 'toolsmenu':         category = 'utility';       title = '🔧 UTILITY COMMANDS'; break;
+      case 'animemenu':         category = 'entertainment'; title = 'Entertainment'; break;
+      case 'toolsmenu':         category = 'utility';       title = 'Tools'; break;
 
       default:
         return sock.sendMessage(chatId, { text: '❌ Invalid menu category!' }, { quoted: msg });
     }
 
-    const list = categories[category] || [];
+    const list = (categories[category] || []).map(x => x.name).filter(Boolean);
     if (!list.length) {
       return sock.sendMessage(
         chatId,
-        { text: `❌ No commands found in ${title}\nTip: Your plugins must use category: "${category}"` },
+        { text: `❌ No commands found in ${title}\nFix: plugins must use category: "${category}"` },
         { quoted: msg }
       );
     }
 
-    list.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    // page: .menu admin 2  OR .adminmenu 2
+    const pageArg = Number(args?.[1] || args?.[0]) || 1;
+    const { out, page, totalPages } = renderTwoCols(list, prefix, pageArg, 24);
 
-    let body = '';
-    for (const cmd of list) body += `│ ➜ ${prefix}${cmd.name}\n`;
+    const submenuTextRaw =
+`${botTitle} • ${title}
+Page ${page}/${totalPages} | ${list.length} cmds
 
-    const submenuText =
-`${title}
-┌────────────────────────────────────────┐
-│ Total: ${list.length}
-└────────────────────────────────────────┘
-┌────────────────────────────────────────┐
-${body.trimEnd()}
-└────────────────────────────────────────┘
-Back → ${prefix}menu   |   Full → ${prefix}mainmenu`;
+${out}
+
+Back: ${prefix}menu
+More: ${prefix}menu ${category} ${page + 1}`;
 
     return sock.sendMessage(
       chatId,
-      { text: mono(submenuText), mentions: [sender] },
+      { text: mono(submenuTextRaw), mentions: [sender] },
       { quoted: msg }
     );
   }
