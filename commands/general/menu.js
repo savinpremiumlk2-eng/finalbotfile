@@ -1,5 +1,8 @@
 /**
- * Menu Command - Display all available commands
+ * .menu - Compact menu + submenus
+ * - .menu (shows menu list)
+ * - .ownermenu, .adminmenu, .dlmenu, .funmenu, .aimenu, .entertainmentmenu, .textmenu, .toolmenu, .moviemenu, .generalmenu
+ * - Also supports: .menu owner / .menu admin / .menu media ... (category names)
  */
 
 const config = require('../../config');
@@ -7,17 +10,27 @@ const { loadCommands } = require('../../utils/commandLoader');
 const fs = require('fs');
 const path = require('path');
 
+function formatUptime(sec) {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.floor(sec % 60);
+  return `${h}h ${m}m ${s}s`;
+}
+
 module.exports = {
   name: 'menu',
   aliases: [
     'help', 'commands',
-    'ownermenu', 'groupmenu', 'dlmenu', 'funmenu', 'aimenu',
-    'stickermenu', 'audiomenu', 'videomenu', 'searchmenu',
-    'toolsmenu', 'convertmenu', 'settingsmenu', 'dbmenu',
-    'othermenu', 'animemenu', 'textmenu', 'moviemenu'
+
+    // sub menu commands
+    'ownermenu', 'adminmenu', 'dlmenu', 'funmenu', 'aimenu',
+    'entertainmentmenu', 'textmenu', 'toolmenu', 'moviemenu', 'generalmenu',
+
+    // backward compatibility
+    'animemenu', 'toolsmenu'
   ],
   category: 'general',
-  description: 'Show all available commands',
+  description: 'Show menus and sub menus',
   usage: '.menu',
 
   async execute(sock, msg, args = [], extra = {}) {
@@ -29,42 +42,34 @@ module.exports = {
         };
 
     try {
-      const commands = loadCommands(); // Map or Array depending on your loader
+      const p = config.prefix || '.';
+
+      const commands = loadCommands();
       const categories = {};
 
-      // Normalize commands into an array
       const cmdList = Array.isArray(commands)
         ? commands
         : (commands instanceof Map ? Array.from(commands.values()) : []);
 
-      // Dedupe by command name (prevents alias duplicates + weird loader behavior)
+      // dedupe by name
       const seen = new Set();
       for (const cmd of cmdList) {
         if (!cmd?.name) continue;
         if (seen.has(cmd.name)) continue;
         seen.add(cmd.name);
 
-        const cat = (cmd.category || 'other').toLowerCase();
+        const cat = String(cmd.category || 'other').toLowerCase().trim();
         if (!categories[cat]) categories[cat] = [];
         categories[cat].push(cmd);
       }
 
-      // Owner display
       const ownerNames = Array.isArray(config.ownerName) ? config.ownerName : [config.ownerName];
-      const displayOwner = ownerNames?.[0] || 'Bot Owner';
+      const displayOwner = ownerNames?.[0] || 'Infinity Team';
 
-      // Uptime
-      const uptime = process.uptime();
-      const hours = Math.floor(uptime / 3600);
-      const minutes = Math.floor((uptime % 3600) / 60);
-      const seconds = Math.floor(uptime % 60);
-      const uptimeString = `${hours}h ${minutes}m ${seconds}s`;
-
-      // RAM
+      const uptimeString = formatUptime(process.uptime());
       const ramUsage = (process.memoryUsage().rss / 1024 / 1024).toFixed(2);
 
-      // Detect submenu either from ".menu xxx" or alias command like ".ownermenu"
-      const usedCommand = (extra?.commandName || '').toLowerCase();
+      const usedCommand = String(extra?.commandName || '').toLowerCase();
       const subMenu =
         (args[0] && String(args[0]).toLowerCase()) ||
         (usedCommand.endsWith('menu') ? usedCommand : null);
@@ -72,39 +77,35 @@ module.exports = {
       const chatId = extra?.from || msg?.key?.remoteJid;
       const sender = extra?.sender;
 
-      // Main menu
+      // MAIN MENU (compact)
       if (!subMenu || subMenu === 'menu') {
-        let menuText = `🤖 *MAIN MENU*\n`;
-        menuText += `╭───〔 🤖 INFINITY MD 〕───\n`;
-        menuText += `│ 👤 *Owner* : ${displayOwner}\n`;
-        menuText += `│ 📊 *Commands* : ${seen.size}\n`;
-        menuText += `│ ⏱ *Uptime* : ${uptimeString}\n`;
-        menuText += `│ 🚀 *RAM* : ${ramUsage}MB\n`;
-        menuText += `│ ⌨️ *Prefix* : ${config.prefix}\n`;
-        menuText += `╰────────────────────\n\n`;
+        let menuText = `╭━━『 ${String(config.botName || 'Infinity MD')} 』━━╮\n`;
+        menuText += `│ ⚡ Prefix: ${p}\n`;
+        menuText += `│ 📦 Total Commands: ${seen.size}\n`;
+        menuText += `│ 👑 Owner: ${displayOwner}\n`;
+        menuText += `│ ⏱ Uptime: ${uptimeString}\n`;
+        menuText += `│ 🧠 RAM: ${ramUsage} MB\n`;
+        menuText += `╰━━━━━━━━━━━━━━━━━━━━╯\n\n`;
 
-        menuText += `╭───〔 📂 MAIN MENUS 〕───\n`;
-        menuText += `│ 👑 ${config.prefix}ownermenu\n`;
-        menuText += `│ 🧩 ${config.prefix}groupmenu\n`;
-        menuText += `│ 📥 ${config.prefix}dlmenu\n`;
-        menuText += `│ 🎮 ${config.prefix}funmenu\n`;
-        menuText += `│ 🤖 ${config.prefix}aimenu\n`;
-        menuText += `│ 🖼 ${config.prefix}stickermenu\n`;
-        menuText += `│ 🎵 ${config.prefix}audiomenu\n`;
-        menuText += `│ 🎥 ${config.prefix}videomenu\n`;
-        menuText += `│ 🔍 ${config.prefix}searchmenu\n`;
-        menuText += `│ 🛠 ${config.prefix}toolsmenu\n`;
-        menuText += `│ 🧠 ${config.prefix}convertmenu\n`;
-        menuText += `│ ⚙️ ${config.prefix}settingsmenu\n`;
-        menuText += `│ 🗄 ${config.prefix}dbmenu\n`;
-        menuText += `│ 🌸 ${config.prefix}animemenu\n`;
-        menuText += `│ ✍️ ${config.prefix}textmenu\n`;
-        menuText += `│ 🎬 ${config.prefix}moviemenu\n`;
-        menuText += `│ 🧪 ${config.prefix}othermenu\n`;
-        menuText += `╰────────────────────\n\n`;
-        menuText += `> 💫 *INFINITY MD* - Powered by AI`;
+        menuText += `┏━━━━━━━━━━━━━━━━━━━━━━\n`;
+        menuText += `┃ 📂 MAIN MENUS\n`;
+        menuText += `┗━━━━━━━━━━━━━━━━━━━━━━\n`;
+        menuText += `│ 👑 Owner         : ${p}ownermenu\n`;
+        menuText += `│ 🛡 Admin         : ${p}adminmenu\n`;
+        menuText += `│ 🎞 Media/Download: ${p}dlmenu\n`;
+        menuText += `│ 🎭 Fun           : ${p}funmenu\n`;
+        menuText += `│ 🤖 AI            : ${p}aimenu\n`;
+        menuText += `│ 👾 Entertainment : ${p}entertainmentmenu\n`;
+        menuText += `│ 🖋 TextMaker     : ${p}textmenu\n`;
+        menuText += `│ 🔧 Utility/Tools : ${p}toolmenu\n`;
+        menuText += `│ 🎬 Movies        : ${p}moviemenu\n`;
+        menuText += `│ 🧭 General       : ${p}generalmenu\n`;
+        menuText += `│ 📜 Full List     : ${p}mainmenu\n`;
+        menuText += `┗━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+        menuText += `💡 Tip: ${p}menu <category>  (ex: ${p}menu admin)\n`;
+        menuText += `✨ *INFINITY MD*`;
 
-        // Banner logic
+        // Banner / image (optional)
         const bannersPath = path.join(__dirname, '../../utils/banners');
         let imagePath = path.join(__dirname, '../../utils/bot_image.jpg');
 
@@ -137,34 +138,38 @@ module.exports = {
         return;
       }
 
-      // Submenu mapping (FIX THESE CATEGORY NAMES to match your plugins)
-      // I made them more logical; change if your commands use different category strings.
+      // submenu mapping
       let category = '';
       let title = '';
 
       switch (subMenu) {
-        case 'ownermenu':     category = 'owner';     title = '👑 OWNER MENU'; break;
-        case 'settingsmenu':  category = 'settings';  title = '⚙️ SETTINGS MENU'; break;
-        case 'dbmenu':        category = 'database';  title = '🗄 DATABASE MENU'; break;
+        // submenu commands
+        case 'generalmenu':         category = 'general';       title = '🧭 GENERAL COMMAND'; break;
+        case 'aimenu':              category = 'ai';            title = '🤖 AI COMMAND'; break;
+        case 'adminmenu':           category = 'admin';         title = '🛡️ ADMIN COMMAND'; break;
+        case 'ownermenu':           category = 'owner';         title = '👑 OWNER COMMAND'; break;
+        case 'dlmenu':              category = 'media';         title = '🎞️ MEDIA COMMAND'; break;
+        case 'funmenu':             category = 'fun';           title = '🎭 FUN COMMAND'; break;
+        case 'toolmenu':            category = 'utility';       title = '🔧 UTILITY COMMAND'; break;
+        case 'entertainmentmenu':   category = 'entertainment'; title = '👾 ENTERTAINMENT COMMAND'; break;
+        case 'textmenu':            category = 'textmaker';     title = '🖋️ TEXTMAKER COMMAND'; break;
+        case 'moviemenu':           category = 'movies';        title = '🎬 MOVIES COMMAND'; break;
 
-        case 'groupmenu':     category = 'group';     title = '🧩 GROUP MENU'; break;
+        // support ".menu admin" style
+        case 'general':             category = 'general';       title = '🧭 GENERAL COMMAND'; break;
+        case 'ai':                  category = 'ai';            title = '🤖 AI COMMAND'; break;
+        case 'admin':               category = 'admin';         title = '🛡️ ADMIN COMMAND'; break;
+        case 'owner':               category = 'owner';         title = '👑 OWNER COMMAND'; break;
+        case 'media':               category = 'media';         title = '🎞️ MEDIA COMMAND'; break;
+        case 'fun':                 category = 'fun';           title = '🎭 FUN COMMAND'; break;
+        case 'utility':             category = 'utility';       title = '🔧 UTILITY COMMAND'; break;
+        case 'entertainment':       category = 'entertainment'; title = '👾 ENTERTAINMENT COMMAND'; break;
+        case 'textmaker':           category = 'textmaker';     title = '🖋️ TEXTMAKER COMMAND'; break;
+        case 'movies':              category = 'movies';        title = '🎬 MOVIES COMMAND'; break;
 
-        case 'dlmenu':        category = 'download';  title = '📥 DOWNLOAD MENU'; break;
-        case 'audiomenu':     category = 'audio';     title = '🎵 AUDIO MENU'; break;
-        case 'videomenu':     category = 'video';     title = '🎥 VIDEO MENU'; break;
-
-        case 'funmenu':       category = 'fun';       title = '🎮 FUN MENU'; break;
-        case 'aimenu':        category = 'ai';        title = '🤖 AI MENU'; break;
-
-        case 'stickermenu':   category = 'sticker';   title = '🖼 STICKER MENU'; break;
-        case 'searchmenu':    category = 'search';    title = '🔍 SEARCH MENU'; break;
-        case 'toolsmenu':     category = 'utility';   title = '🛠 TOOLS MENU'; break;
-        case 'convertmenu':   category = 'convert';   title = '🧠 CONVERT MENU'; break;
-
-        case 'animemenu':     category = 'anime';     title = '🌸 ANIME MENU'; break;
-        case 'textmenu':      category = 'textmaker'; title = '✍️ TEXT MENU'; break;
-        case 'moviemenu':     category = 'movies';    title = '🎬 MOVIE MENU'; break;
-        case 'othermenu':     category = 'other';     title = '🧪 OTHER MENU'; break;
+        // backward compatibility
+        case 'animemenu':           category = 'entertainment'; title = '👾 ENTERTAINMENT COMMAND'; break;
+        case 'toolsmenu':           category = 'utility';       title = '🔧 UTILITY COMMAND'; break;
 
         default:
           return reply('❌ Invalid menu category!');
@@ -172,20 +177,34 @@ module.exports = {
 
       const list = categories[category];
       if (!list || !list.length) {
-        return reply(`❌ No commands found in ${title}\n\nTip: Your plugins may use a different "category" name than "${category}".`);
+        return reply(
+          `❌ No commands found in ${title}\n\n` +
+          `✅ Make sure your plugins use:\n` +
+          `category: "${category}"`
+        );
       }
 
-      // Sort commands
       list.sort((a, b) => String(a.name).localeCompare(String(b.name)));
 
-      let text = `╭───〔 ${title} 〕───\n`;
-      for (const cmd of list) {
-        text += `│ ➜ ${config.prefix}${cmd.name}\n`;
-      }
-      text += `╰────────────────────\n\n`;
-      text += `> 💫 *INFINITY MD* - Powered by AI`;
+      let text = `╭━━『 ${String(config.botName || 'Infinity MD')} 』━━╮\n`;
+      text += `┃ ${title}\n`;
+      text += `╰━━━━━━━━━━━━━━━━━━━━╯\n\n`;
 
-      return reply(text);
+      text += `┏━━━━━━━━━━━━━━━━━━━━━━\n`;
+      text += `┃ Commands (${list.length})\n`;
+      text += `┗━━━━━━━━━━━━━━━━━━━━━━\n`;
+      for (const cmd of list) {
+        text += `│ ➜ ${p}${cmd.name}\n`;
+      }
+      text += `┗━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+      text += `💡 Tip: ${p}mainmenu (for full list)\n`;
+      text += `✨ *INFINITY MD*`;
+
+      return sock.sendMessage(
+        chatId,
+        { text, mentions: sender ? [sender] : [] },
+        { quoted: msg }
+      );
 
     } catch (error) {
       return reply(`❌ Error: ${error.message}`);
