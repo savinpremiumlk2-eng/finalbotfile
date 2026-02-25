@@ -1,17 +1,12 @@
 /**
- * ✅ FULL MENU FILE (MOBILE FRIENDLY + BOXES + EMOJIS + NUMBER-REPLY SYSTEM + INFINITY MD CREDITS)
+ * Infinity MD - Menu System (FINAL)
  * File: commands/general/menu.js
  *
- * Features:
- * - Banner image + forwarded newsletter style
- * - Modern mobile-friendly boxed design (your template)
- * - Submenus: .ownermenu .adminmenu .dlmenu .funmenu .aimenu .toolmenu .entertainmentmenu .textmenu .moviemenu .generalmenu
- * - Number reply system (1-10 / 0) stored in memory for 2 minutes
- * - Includes Infinity MD credits at bottom
+ * ✅ Main menu: banner + forwarded style + boxes + emojis (mobile friendly)
+ * ✅ Submenus: SAME style as .menu (not garbage) + paginated + numbered
+ * ✅ Number reply: works for main menu + submenu command list
  *
- * IMPORTANT:
- * - Number-reply needs ONE small snippet in your main messages.upsert handler.
- *   (I include the snippet at the bottom of this file.)
+ * ⚠️ REQUIRED: paste the small handler snippet (at bottom) into messages.upsert
  */
 
 const config = require('../../config');
@@ -19,40 +14,54 @@ const { loadCommands } = require('../../utils/commandLoader');
 const fs = require('fs');
 const path = require('path');
 
-// -------------------- Number-reply storage (in-memory) --------------------
+// -------------------- Number reply session (in-memory) --------------------
 const MENU_TTL_MS = 2 * 60 * 1000; // 2 minutes
-const MENU_SESSIONS = new Map();   // key => { expiresAt, map }
+const MENU_SESSIONS = new Map();   // key -> { expiresAt, map }
 
-function sessionKey(chatId, sender) {
+function skey(chatId, sender) {
   return `${chatId}:${sender}`;
 }
 
-function setMenuSession(chatId, sender, map) {
-  MENU_SESSIONS.set(sessionKey(chatId, sender), {
-    expiresAt: Date.now() + MENU_TTL_MS,
-    map
-  });
+function setSession(chatId, sender, map) {
+  MENU_SESSIONS.set(skey(chatId, sender), { expiresAt: Date.now() + MENU_TTL_MS, map });
 }
 
-function getMenuSession(chatId, sender) {
-  const k = sessionKey(chatId, sender);
-  const s = MENU_SESSIONS.get(k);
+function getSession(chatId, sender) {
+  const s = MENU_SESSIONS.get(skey(chatId, sender));
   if (!s) return null;
   if (Date.now() > s.expiresAt) {
-    MENU_SESSIONS.delete(k);
+    MENU_SESSIONS.delete(skey(chatId, sender));
     return null;
   }
   return s;
 }
 
-function clearMenuSession(chatId, sender) {
-  MENU_SESSIONS.delete(sessionKey(chatId, sender));
+function clearSession(chatId, sender) {
+  MENU_SESSIONS.delete(skey(chatId, sender));
 }
 
-// Export helper so your main handler can use it
+/**
+ * Used by messages.upsert to resolve a numeric reply into a command string
+ * returns: string | null
+ */
+function resolveNumberReply(chatId, sender, text) {
+  const t = String(text || '').trim();
+  if (!/^\d{1,2}$/.test(t)) return null;
+
+  const s = getSession(chatId, sender);
+  if (!s) return null;
+
+  const cmd = s.map[t];
+  if (!cmd) return null;
+
+  // one-time use (prevents accidental repeats)
+  clearSession(chatId, sender);
+  return cmd;
+}
+
+// Expose to main handler
 module.exports._menuReply = {
-  getMenuSession,
-  clearMenuSession
+  resolveNumberReply,
 };
 
 // -------------------- Helpers --------------------
@@ -61,11 +70,6 @@ function formatUptime(sec) {
   const m = Math.floor((sec % 3600) / 60);
   const s = Math.floor(sec % 60);
   return `${h}h ${m}m ${s}s`;
-}
-
-function mono(txt) {
-  // monospace makes lists align better on mobile
-  return '```' + '\n' + txt + '\n' + '```';
 }
 
 function mentionTag(jid = '') {
@@ -81,7 +85,7 @@ function pickMenuImage() {
     if (fs.existsSync(bannersPath)) {
       const banners = fs.readdirSync(bannersPath).filter(f => /\.(jpg|jpeg|png)$/i.test(f));
       if (banners.length) {
-        imagePath = path.join(bannersPath, banners[Math.random() * banners.length | 0]);
+        imagePath = path.join(bannersPath, banners[Math.floor(Math.random() * banners.length)]);
       }
     }
   } catch (_) {}
@@ -107,6 +111,12 @@ function buildCategoriesMap(commands) {
   }
 
   return { categories, total: seen.size };
+}
+
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
 }
 
 // -------------------- Command --------------------
@@ -149,7 +159,7 @@ module.exports = {
     if (!subMenu || subMenu === 'menu') {
       const who = mentionTag(sender);
 
-      // number-reply mapping
+      // main menu number mapping
       const numberMap = {
         '1': `${prefix}ownermenu`,
         '2': `${prefix}adminmenu`,
@@ -163,8 +173,7 @@ module.exports = {
         '10': `${prefix}generalmenu`,
         '0': `${prefix}mainmenu`
       };
-
-      setMenuSession(chatId, sender, numberMap);
+      setSession(chatId, sender, numberMap);
 
       let menuText = `🤖 *MAIN MENU*\n`;
       menuText += `╭───〔 🤖 ${botName} 〕───\n`;
@@ -190,12 +199,13 @@ module.exports = {
       menuText += `│ 0️⃣ 📜 ${prefix}mainmenu\n`;
       menuText += `╰────────────────────\n\n`;
 
-      menuText += `💡 *Reply with a number* (1-10 / 0) to open.\n`;
+      menuText += `💡 *Reply with a number* (1-10 / 0)\n`;
       menuText += `╭───〔 🌟 CREDITS 〕───\n`;
       menuText += `│ ⚡ *Infinity MD* by Infinity Team\n`;
       menuText += `│ 🧠 Powered by Baileys\n`;
       menuText += `╰────────────────────`;
 
+      // banner + forwarded style
       const imgPath = pickMenuImage();
       if (imgPath) {
         const imageBuffer = fs.readFileSync(imgPath);
@@ -222,7 +232,7 @@ module.exports = {
       return sock.sendMessage(chatId, { text: menuText, mentions: [sender] }, { quoted: msg });
     }
 
-    // ---------------- SUBMENUS (MODERN + SMALL) ----------------
+    // ---------------- SUBMENUS (SAME STYLE AS .menu) ----------------
     let category = '';
     let title = '';
 
@@ -258,7 +268,7 @@ module.exports = {
         return sock.sendMessage(chatId, { text: '❌ Invalid menu category!' }, { quoted: msg });
     }
 
-    const list = categories[category] || [];
+    const list = (categories[category] || []).map(x => x.name).filter(Boolean);
     if (!list.length) {
       return sock.sendMessage(
         chatId,
@@ -267,55 +277,49 @@ module.exports = {
       );
     }
 
-    list.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    list.sort((a, b) => String(a).localeCompare(String(b)));
 
-    // Mobile-friendly: 2 columns inside a small box
-    const names = list.map(x => `${prefix}${x.name}`);
-    const colW = 14;
+    // Page support: ".adminmenu 2" OR ".menu admin 2"
+    const pageArg = Number(args?.[1] || args?.[0] || 1);
+    const perPage = 20; // mobile friendly
+    const pages = chunk(list, perPage);
+    const totalPages = Math.max(1, pages.length);
+    const page = Math.min(Math.max(1, pageArg), totalPages);
+    const pageItems = pages[page - 1];
+
+    // Build numbered list + number reply map (1..20, 0 back, 99 next page)
+    const submenuMap = { '0': `${prefix}menu` };
     let lines = '';
-    for (let i = 0; i < names.length; i += 2) {
-      const a = (names[i] || '').padEnd(colW, ' ');
-      const b = (names[i + 1] || '');
-      lines += `│ ${a} ${b}\n`;
+    for (let i = 0; i < pageItems.length; i++) {
+      const n = String(i + 1);
+      const cmdName = pageItems[i];
+      submenuMap[n] = `${prefix}${cmdName}`;
+      // short line to fit mobile
+      lines += `│ ${n.padStart(2, '0')} ➜ ${prefix}${cmdName}\n`;
     }
+    // Optional next page shortcut
+    if (page < totalPages) submenuMap['99'] = `${prefix}menu ${category} ${page + 1}`;
+    setSession(chatId, sender, submenuMap);
 
     let submenuText = `${title}\n`;
-    submenuText += `╭───〔 📋 COMMANDS 〕───\n`;
-    submenuText += `│ 📦 Total : ${names.length}\n`;
-    submenuText += `╰────────────────────\n`;
-    submenuText += `╭───〔 ✅ LIST 〕───\n`;
+    submenuText += `╭───〔 🤖 ${botName} 〕───\n`;
+    submenuText += `│ 📦 *Total* : ${list.length}\n`;
+    submenuText += `│ 📄 *Page* : ${page}/${totalPages}\n`;
+    submenuText += `│ ⌨️ *Prefix* : ${prefix}\n`;
+    submenuText += `╰────────────────────\n\n`;
+
+    submenuText += `╭───〔 ✅ COMMANDS 〕───\n`;
     submenuText += lines;
     submenuText += `╰────────────────────\n\n`;
-    submenuText += `⬅ Back: ${prefix}menu  |  📜 Full: ${prefix}mainmenu\n`;
-    submenuText += `⚡ Infinity MD • Infinity Team`;
 
-    return sock.sendMessage(
-      chatId,
-      { text: mono(submenuText), mentions: [sender] },
-      { quoted: msg }
-    );
+    submenuText += `💡 Reply *1-${pageItems.length}* to run a command\n`;
+    submenuText += `💡 Reply *0* to go back`;
+    if (page < totalPages) submenuText += `\n💡 Reply *99* for next page`;
+
+    submenuText += `\n╭───〔 🌟 CREDITS 〕───\n`;
+    submenuText += `│ ⚡ Infinity MD • Infinity Team\n`;
+    submenuText += `╰────────────────────`;
+
+    return sock.sendMessage(chatId, { text: submenuText, mentions: [sender] }, { quoted: msg });
   }
 };
-
-/**
- * ✅ REQUIRED NUMBER-REPLY HANDLER SNIPPET
- *
- * Paste this into your messages.upsert handler BEFORE normal command parsing:
- *
- *   const menuCmd = require('./commands/general/menu'); // adjust path if needed
- *   const chatId = m.key.remoteJid;
- *   const sender = m.key.participant || chatId;
- *   const text = extractedText; // your text extractor
- *
- *   const sess = menuCmd._menuReply.getMenuSession(chatId, sender);
- *   if (sess && /^\\d{1,2}$/.test(text.trim())) {
- *     const cmdText = sess.map[text.trim()];
- *     if (cmdText) {
- *       menuCmd._menuReply.clearMenuSession(chatId, sender);
- *       // Feed cmdText into your existing command handler/parser:
- *       // example: handleCommand(cmdText, m)
- *     }
- *   }
- *
- * If you paste your handler code, I will merge this perfectly for your bot base.
- */
