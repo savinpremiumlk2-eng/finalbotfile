@@ -1,10 +1,13 @@
 /**
- * ✅ BEAUTIFUL .menu with 5 RANDOM DESIGNS (Infinity MD)
- * - Every time user types .menu it will randomly pick 1 of 5 designs
- * - Keeps banner image support (optional)
- * - Submenus (admin/owner/etc) still work
+ * ✅ FINAL UPDATED .menu (Infinity MD)
+ * - 8 Random designs
+ * - Monospace aligned layouts (fixes WhatsApp ugly spacing)
+ * - Optional fancy unicode font headers
+ * - Banner image support (random)
+ * - Submenus work: .adminmenu .ownermenu .dlmenu .funmenu .aimenu .entertainmentmenu .textmenu .toolmenu .moviemenu .generalmenu
+ * - Also supports: .menu admin / .menu media / ...
  *
- * Replace: commands/general/menu.js
+ * Drop-in file: commands/general/menu.js
  */
 
 const config = require('../../config');
@@ -44,6 +47,11 @@ function randPick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+function monoBlock(text) {
+  // WhatsApp monospace block for perfect alignment
+  return '```\n' + text + '\n```';
+}
+
 function buildMenuLinks(prefix) {
   return {
     general: `${prefix}generalmenu`,
@@ -60,152 +68,355 @@ function buildMenuLinks(prefix) {
   };
 }
 
-/** 5 MAIN MENU DESIGNS */
+// --- Fancy header styles (optional “fonts”) ---
+const HEADER_STYLES = {
+  normal: (s) => s,
+  boldcaps: (s) => s.toUpperCase(),
+  boxed: (s) => `【 ${s} 】`,
+  stars: (s) => `✦ ${s} ✦`,
+  neon: (s) => `⚡🟣 ${s} 🟣⚡`,
+  smallcaps: (s) => s.replace(/[a-z]/g, c => c.toUpperCase())
+};
+
+function styleHeader(title) {
+  const styles = Object.keys(HEADER_STYLES);
+  const k = randPick(styles);
+  return HEADER_STYLES[k](title);
+}
+
+// Helpers for aligned “CONTROL PANEL” rows
+function makeAlignedRows(width = 26) {
+  const row = (icon, label, value) => {
+    const left = `${icon} ${label}`.padEnd(width, ' ');
+    return `│ ${left}: ${value}`;
+  };
+  const navRow = (n, icon, label, cmd) => {
+    const left = `[${String(n).padStart(2, '0')}] ${icon} ${label}`.padEnd(width, ' ');
+    return `│ ${left}: ${cmd}`;
+  };
+  return { row, navRow };
+}
+
+/**
+ * 8 MAIN MENU DESIGNS
+ * All designs return a string; designs 2,6,7,8 are monospace aligned (best).
+ */
 function renderMainMenuDesign(designId, ctx) {
-  const {
-    botName, owner, prefix, total, uptime, ram, who, links
-  } = ctx;
+  const { botName, owner, prefix, total, uptime, ram, who, links } = ctx;
+
+  // increase width if you have longer labels
+  const W = 28;
+  const { row, navRow } = makeAlignedRows(W);
 
   switch (designId) {
-    // ✅ DESIGN 1 (Clean card + arrows)
+    // 1) Clean card (normal)
     case 1:
       return (
-`✨ *${botName}* ✨
-
-╭───────────────╮
-│ 👋 Hello *${who}*
-│ ⚡ Prefix  : *${prefix}*
-│ 📦 Commands: *${total}*
-│ 👑 Owner   : *${owner}*
-│ ⏱ Uptime  : *${uptime}*
-│ 🧠 RAM     : *${ram} MB*
-╰───────────────╯
-
-📚 *MENUS*
-╭────────────────────────╮
-│ 🧭 General        → ${links.general}
-│ 🤖 AI             → ${links.ai}
-│ 🛡️ Admin          → ${links.admin}
-│ 👑 Owner          → ${links.owner}
-│ 🎞️ Media          → ${links.media}
-│ 🎭 Fun            → ${links.fun}
-│ 🔧 Utility        → ${links.utility}
-│ 👾 Entertainment  → ${links.entertainment}
-│ 🖋 TextMaker      → ${links.textmaker}
-│ 🎬 Movies         → ${links.movies}
-╰────────────────────────╯
-
-🗂 Full list: *${links.full}*
-💡 Example: *${prefix}menu admin*`
+`✨ *${botName}* ✨\n\n` +
+`╭───────────────╮\n` +
+`│ 👋 Hello *${who}*\n` +
+`│ ⚡ Prefix  : *${prefix}*\n` +
+`│ 📦 Commands: *${total}*\n` +
+`│ 👑 Owner   : *${owner}*\n` +
+`│ ⏱ Uptime  : *${uptime}*\n` +
+`│ 🧠 RAM     : *${ram} MB*\n` +
+`╰───────────────╯\n\n` +
+`📚 *MENUS*\n` +
+`╭────────────────────────╮\n` +
+`│ 🧭 General        → ${links.general}\n` +
+`│ 🤖 AI             → ${links.ai}\n` +
+`│ 🛡️ Admin          → ${links.admin}\n` +
+`│ 👑 Owner          → ${links.owner}\n` +
+`│ 🎞️ Media          → ${links.media}\n` +
+`│ 🎭 Fun            → ${links.fun}\n` +
+`│ 🔧 Utility        → ${links.utility}\n` +
+`│ 👾 Entertainment  → ${links.entertainment}\n` +
+`│ 🖋 TextMaker      → ${links.textmaker}\n` +
+`│ 🎬 Movies         → ${links.movies}\n` +
+`╰────────────────────────╯\n\n` +
+`🗂 Full list: *${links.full}*\n` +
+`💡 Example: *${prefix}menu admin*`
       );
 
-    // ✅ DESIGN 2 (Neon / cyber)
-    case 2:
-      return (
-`⚡🟣 *${botName} CONTROL PANEL* 🟣⚡
-┏━━━━━━━━━━━━━━━━━━━━━━┓
-┃ 👤 User     : *${who}*
-┃ 👑 Owner    : *${owner}*
-┃ ⚡ Prefix   : *${prefix}*
-┃ 📦 Commands : *${total}*
-┃ ⏱ Uptime   : *${uptime}*
-┃ 🧠 RAM      : *${ram} MB*
-┗━━━━━━━━━━━━━━━━━━━━━━┛
+    // 2) CONTROL PANEL (monospace aligned) ✅ fixes ugly alignment
+    case 2: {
+      const title = styleHeader(`${botName} CONTROL PANEL`);
+      const panel =
+`${title}
+` +
+`┌────────────────────────────────────────┐
+` +
+`${row('👤', 'User', who)}
+` +
+`${row('👑', 'Owner', owner)}
+` +
+`${row('⚡', 'Prefix', prefix)}
+` +
+`${row('📦', 'Commands', total)}
+` +
+`${row('⏱', 'Uptime', uptime)}
+` +
+`${row('🧠', 'RAM', `${ram} MB`)}
+` +
+`└────────────────────────────────────────┘
 
-🔰 *NAVIGATION*
-[1] 🧭 General        : ${links.general}
-[2] 🤖 AI             : ${links.ai}
-[3] 🛡️ Admin          : ${links.admin}
-[4] 👑 Owner          : ${links.owner}
-[5] 🎞️ Media          : ${links.media}
-[6] 🎭 Fun            : ${links.fun}
-[7] 🔧 Utility        : ${links.utility}
-[8] 👾 Entertainment  : ${links.entertainment}
-[9] 🖋 TextMaker      : ${links.textmaker}
-[10] 🎬 Movies        : ${links.movies}
+` +
+`🧭 NAVIGATION
+` +
+`┌────────────────────────────────────────┐
+` +
+`${navRow(1,  '🧭', 'General', links.general)}
+` +
+`${navRow(2,  '🤖', 'AI', links.ai)}
+` +
+`${navRow(3,  '🛡️', 'Admin', links.admin)}
+` +
+`${navRow(4,  '👑', 'Owner', links.owner)}
+` +
+`${navRow(5,  '🎞️', 'Media', links.media)}
+` +
+`${navRow(6,  '🎭', 'Fun', links.fun)}
+` +
+`${navRow(7,  '🔧', 'Utility', links.utility)}
+` +
+`${navRow(8,  '👾', 'Entertainment', links.entertainment)}
+` +
+`${navRow(9,  '🖋️', 'TextMaker', links.textmaker)}
+` +
+`${navRow(10, '🎬', 'Movies', links.movies)}
+` +
+`└────────────────────────────────────────┘
 
-📜 *FULL COMMAND LIST* → ${links.full}`
-      );
+` +
+`📜 FULL COMMAND LIST → ${links.full}`;
 
-    // ✅ DESIGN 3 (Minimal + tidy columns feel)
+      return monoBlock(panel);
+    }
+
+    // 3) Minimal (normal)
     case 3:
       return (
-`*${botName}*
-Hello *${who}* 👋
-
-• Prefix: *${prefix}*   • Commands: *${total}*
-• Owner : *${owner}*   • Uptime  : *${uptime}*
-
-╭──────── MENUS ────────╮
-│ ${links.general}   | 🧭 General
-│ ${links.ai}        | 🤖 AI
-│ ${links.admin}     | 🛡️ Admin
-│ ${links.owner}     | 👑 Owner
-│ ${links.media}     | 🎞️ Media
-│ ${links.fun}       | 🎭 Fun
-│ ${links.utility}   | 🔧 Utility
-│ ${links.entertainment} | 👾 Entertainment
-│ ${links.textmaker} | 🖋 TextMaker
-│ ${links.movies}    | 🎬 Movies
-╰───────────────────────╯
-
-📜 Full: *${links.full}*`
+`*${botName}*\n` +
+`Hello *${who}* 👋\n\n` +
+`• Prefix: *${prefix}*   • Commands: *${total}*\n` +
+`• Owner : *${owner}*   • Uptime  : *${uptime}*\n\n` +
+`╭──────── MENUS ────────╮\n` +
+`│ ${links.general}   | 🧭 General\n` +
+`│ ${links.ai}        | 🤖 AI\n` +
+`│ ${links.admin}     | 🛡️ Admin\n` +
+`│ ${links.owner}     | 👑 Owner\n` +
+`│ ${links.media}     | 🎞️ Media\n` +
+`│ ${links.fun}       | 🎭 Fun\n` +
+`│ ${links.utility}   | 🔧 Utility\n` +
+`│ ${links.entertainment} | 👾 Entertainment\n` +
+`│ ${links.textmaker} | 🖋 TextMaker\n` +
+`│ ${links.movies}    | 🎬 Movies\n` +
+`╰───────────────────────╯\n\n` +
+`📜 Full: *${links.full}*`
       );
 
-    // ✅ DESIGN 4 (Fancy box + icons)
+    // 4) Boxed (normal)
     case 4:
       return (
-`╔══════════════════════╗
-║  🤖 ${botName.toUpperCase()}
-╠══════════════════════╣
-║ 👋 User    : ${who}
-║ 👑 Owner   : ${owner}
-║ ⚡ Prefix  : ${prefix}
-║ 📦 Cmds    : ${total}
-║ ⏱ Uptime  : ${uptime}
-║ 🧠 RAM     : ${ram} MB
-╚══════════════════════╝
-
-╭─────── MENU LIST ───────╮
-│ 🧭 ${links.general}
-│ 🤖 ${links.ai}
-│ 🛡️ ${links.admin}
-│ 👑 ${links.owner}
-│ 🎞️ ${links.media}
-│ 🎭 ${links.fun}
-│ 🔧 ${links.utility}
-│ 👾 ${links.entertainment}
-│ 🖋 ${links.textmaker}
-│ 🎬 ${links.movies}
-╰─────────────────────────╯
-
-📜 Full Commands: *${links.full}*
-💡 Try: *${prefix}menu fun*`
+`╔══════════════════════╗\n` +
+`║  🤖 ${String(botName).toUpperCase()}\n` +
+`╠══════════════════════╣\n` +
+`║ 👋 User    : ${who}\n` +
+`║ 👑 Owner   : ${owner}\n` +
+`║ ⚡ Prefix  : ${prefix}\n` +
+`║ 📦 Cmds    : ${total}\n` +
+`║ ⏱ Uptime  : ${uptime}\n` +
+`║ 🧠 RAM     : ${ram} MB\n` +
+`╚══════════════════════╝\n\n` +
+`╭─────── MENU LIST ───────╮\n` +
+`│ 🧭 ${links.general}\n` +
+`│ 🤖 ${links.ai}\n` +
+`│ 🛡️ ${links.admin}\n` +
+`│ 👑 ${links.owner}\n` +
+`│ 🎞️ ${links.media}\n` +
+`│ 🎭 ${links.fun}\n` +
+`│ 🔧 ${links.utility}\n` +
+`│ 👾 ${links.entertainment}\n` +
+`│ 🖋 ${links.textmaker}\n` +
+`│ 🎬 ${links.movies}\n` +
+`╰─────────────────────────╯\n\n` +
+`📜 Full Commands: *${links.full}*`
       );
 
-    // ✅ DESIGN 5 (Compact “quick buttons” style)
-    default:
+    // 5) Quick buttons (normal)
+    case 5:
       return (
-`🌀 *${botName} MENU*
-Hi *${who}* 👋  |  Prefix: *${prefix}*  |  Cmds: *${total}*
-
-⏱ ${uptime}   🧠 ${ram}MB   👑 ${owner}
-
-╭──── QUICK MENUS ────╮
-│ [🧭] ${links.general}
-│ [🤖] ${links.ai}
-│ [🛡️] ${links.admin}
-│ [👑] ${links.owner}
-│ [🎞️] ${links.media}
-│ [🎭] ${links.fun}
-│ [🔧] ${links.utility}
-│ [👾] ${links.entertainment}
-│ [🖋] ${links.textmaker}
-│ [🎬] ${links.movies}
-╰─────────────────────╯
-
-📜 Full list: *${links.full}*`
+`🌀 *${botName} MENU*\n` +
+`Hi *${who}* 👋  |  Prefix: *${prefix}*  |  Cmds: *${total}*\n\n` +
+`⏱ ${uptime}   🧠 ${ram}MB   👑 ${owner}\n\n` +
+`╭──── QUICK MENUS ────╮\n` +
+`│ [🧭] ${links.general}\n` +
+`│ [🤖] ${links.ai}\n` +
+`│ [🛡️] ${links.admin}\n` +
+`│ [👑] ${links.owner}\n` +
+`│ [🎞️] ${links.media}\n` +
+`│ [🎭] ${links.fun}\n` +
+`│ [🔧] ${links.utility}\n` +
+`│ [👾] ${links.entertainment}\n` +
+`│ [🖋] ${links.textmaker}\n` +
+`│ [🎬] ${links.movies}\n` +
+`╰─────────────────────╯\n\n` +
+`📜 Full list: *${links.full}*`
       );
+
+    // 6) Two-column monospace list ✅
+    case 6: {
+      const menu = [
+        ['🧭', 'General', links.general],
+        ['🤖', 'AI', links.ai],
+        ['🛡️', 'Admin', links.admin],
+        ['👑', 'Owner', links.owner],
+        ['🎞️', 'Media', links.media],
+        ['🎭', 'Fun', links.fun],
+        ['🔧', 'Utility', links.utility],
+        ['👾', 'Entertainment', links.entertainment],
+        ['🖋️', 'TextMaker', links.textmaker],
+        ['🎬', 'Movies', links.movies]
+      ];
+
+      const left = [];
+      const right = [];
+      for (let i = 0; i < menu.length; i++) {
+        (i % 2 === 0 ? left : right).push(menu[i]);
+      }
+
+      const col = (it) => {
+        const [ic, name, cmd] = it;
+        const l = `${ic} ${name}`.padEnd(16, ' ');
+        return `${l} ${cmd}`;
+      };
+
+      let body = '';
+      const rows = Math.max(left.length, right.length);
+      for (let i = 0; i < rows; i++) {
+        const a = left[i] ? col(left[i]) : ''.padEnd(26, ' ');
+        const b = right[i] ? col(right[i]) : '';
+        body += `│ ${a.padEnd(30, ' ')} ${b}\n`;
+      }
+
+      const title = styleHeader(`${botName} MENU`);
+      const panel =
+`${title}
+` +
+`┌────────────────────────────────────────┐
+` +
+`${row('👤', 'User', who)}
+` +
+`${row('⚡', 'Prefix', prefix)}
+` +
+`${row('📦', 'Commands', total)}
+` +
+`${row('👑', 'Owner', owner)}
+` +
+`└────────────────────────────────────────┘
+
+` +
+`┌────────────────────────────────────────┐
+` +
+`${body.trimEnd()}
+` +
+`└────────────────────────────────────────┘
+
+` +
+`📜 FULL → ${links.full}`;
+
+      return monoBlock(panel);
+    }
+
+    // 7) Monospace “steps” ✅
+    case 7: {
+      const title = styleHeader(`${botName} NAV`);
+      const panel =
+`${title}
+` +
+`┌────────────────────────────────────────┐
+` +
+`${row('👋', 'Hello', who)}
+` +
+`${row('⚡', 'Prefix', prefix)}
+` +
+`${row('📦', 'Commands', total)}
+` +
+`${row('⏱', 'Uptime', uptime)}
+` +
+`└────────────────────────────────────────┘
+
+` +
+`1) ${links.general}
+` +
+`2) ${links.ai}
+` +
+`3) ${links.admin}
+` +
+`4) ${links.owner}
+` +
+`5) ${links.media}
+` +
+`6) ${links.fun}
+` +
+`7) ${links.utility}
+` +
+`8) ${links.entertainment}
+` +
+`9) ${links.textmaker}
+` +
+`10) ${links.movies}
+
+` +
+`FULL → ${links.full}`;
+      return monoBlock(panel);
+    }
+
+    // 8) Monospace “dashboard compact” ✅
+    default: {
+      const title = styleHeader(`${botName} DASH`);
+      const panel =
+`${title}
+` +
+`┌────────────────────────────────────────┐
+` +
+`${row('👤', 'User', who)}
+` +
+`${row('👑', 'Owner', owner)}
+` +
+`${row('⚡', 'Prefix', prefix)}
+` +
+`${row('📦', 'Commands', total)}
+` +
+`${row('🧠', 'RAM', `${ram} MB`)}
+` +
+`└────────────────────────────────────────┘
+
+` +
+`General: ${links.general}
+` +
+`AI     : ${links.ai}
+` +
+`Admin  : ${links.admin}
+` +
+`Owner  : ${links.owner}
+` +
+`Media  : ${links.media}
+` +
+`Fun    : ${links.fun}
+` +
+`Utility: ${links.utility}
+` +
+`Entert : ${links.entertainment}
+` +
+`Text   : ${links.textmaker}
+` +
+`Movies : ${links.movies}
+
+` +
+`FULL → ${links.full}`;
+      return monoBlock(panel);
+    }
   }
 }
 
@@ -273,12 +484,22 @@ module.exports = {
         const who = getMentionTag(sender);
         const links = buildMenuLinks(prefix);
 
-        const designId = randPick([1, 2, 3, 4, 5]);
+        // Prefer monospace designs more often
+        const designPool = [2, 6, 8, 1, 3, 4, 5, 7];
+        const designId = randPick(designPool);
+
         const menuText = renderMainMenuDesign(designId, {
-          botName, owner, prefix, total, uptime, ram, who, links
+          botName,
+          owner,
+          prefix,
+          total,
+          uptime,
+          ram,
+          who,
+          links
         });
 
-        // Send with image if exists (optional)
+        // Send with image if exists
         const imgPath = pickMenuImage();
         if (imgPath) {
           const imageBuffer = fs.readFileSync(imgPath);
@@ -309,7 +530,7 @@ module.exports = {
         );
       }
 
-      // ✅ SUBMENU mapping (your corrected categories)
+      // ✅ SUBMENU mapping
       let category = '';
       let title = '';
 
@@ -355,25 +576,36 @@ module.exports = {
 
       list.sort((a, b) => String(a.name).localeCompare(String(b.name)));
 
-      // ✅ Nice submenu style (clean)
+      // ✅ Submenu: monospace aligned list
+      const width = 20;
+      const hdr = styleHeader(`${botName} • ${title}`);
       let body = '';
-      for (const cmd of list) body += `│ ➜ ${prefix}${cmd.name}\n`;
+      for (const cmd of list) {
+        body += `│ ${(prefix + cmd.name).padEnd(width, ' ')}\n`;
+      }
 
-      const text =
-`✨ *${botName}* ✨
-╭────────────────────────╮
-│ ${title}
-│ 📌 Total: *${list.length}*
-╰────────────────────────╯
-╭────────────────────────╮
-${body.trimEnd()}
-╰────────────────────────╯
+      const panel =
+`${hdr}
+` +
+`┌────────────────────────────────────────┐
+` +
+`│ Total: ${String(list.length)}
+` +
+`└────────────────────────────────────────┘
 
-💡 Back: *${prefix}menu*   |   📜 Full: *${prefix}mainmenu*`;
+` +
+`┌────────────────────────────────────────┐
+` +
+`${body.trimEnd()}
+` +
+`└────────────────────────────────────────┘
+
+` +
+`Back → ${prefix}menu   |   Full → ${prefix}mainmenu`;
 
       return sock.sendMessage(
         chatId,
-        { text, mentions: sender ? [sender] : [] },
+        { text: monoBlock(panel), mentions: sender ? [sender] : [] },
         { quoted: msg }
       );
 
