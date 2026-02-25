@@ -1,7 +1,5 @@
 const config = require('../../config');
 const { loadCommands } = require('../../utils/commandLoader');
-const fs = require('fs');
-const path = require('path');
 
 function formatUptime(sec) {
   const h = Math.floor(sec / 3600);
@@ -19,210 +17,82 @@ function mono(txt) {
   return '```' + '\n' + txt + '\n' + '```';
 }
 
-function pickMenuImage() {
-  const bannersPath = path.join(__dirname, '../../utils/banners');
-  let imagePath = path.join(__dirname, '../../utils/bot_image.jpg');
-
-  try {
-    if (fs.existsSync(bannersPath)) {
-      const banners = fs.readdirSync(bannersPath).filter(f => /\.(jpg|jpeg|png)$/i.test(f));
-      if (banners.length) {
-        imagePath = path.join(bannersPath, banners[Math.floor(Math.random() * banners.length)]);
-      }
-    }
-  } catch (_) {}
-
-  return fs.existsSync(imagePath) ? imagePath : null;
+function buildSection(title, names, prefix) {
+  if (!names.length) return '';
+  let s = `┏━━━━━━━━━━━━━━━━━\n┃ ${title}\n┗━━━━━━━━━━━━━━━━━\n`;
+  for (const n of names.sort((a,b)=>a.localeCompare(b))) s += `│ ➜ ${prefix}${n}\n`;
+  return s + '\n';
 }
 
 module.exports = {
-  name: 'menu',
-  aliases: [
-    'help', 'commands',
-    'ownermenu', 'adminmenu', 'dlmenu', 'funmenu', 'aimenu',
-    'entertainmentmenu', 'textmenu', 'toolmenu', 'moviemenu', 'generalmenu',
-    // back-compat
-    'animemenu', 'toolsmenu'
-  ],
+  name: 'mainmenu',
+  aliases: ['allmenu', 'fullmenu'],
   category: 'general',
-  description: 'Show menu + submenus',
-  usage: '.menu',
+  description: 'Full command list',
+  usage: '.mainmenu',
 
   async execute(sock, msg, args = [], extra = {}) {
     const chatId = extra?.from || msg?.key?.remoteJid;
     const sender = extra?.sender || msg?.key?.participant || chatId;
 
     const prefix = config.prefix || '.';
-    const botName = String(config.botName || 'INFINITY MD');
 
-    // Load commands grouped by category
     const commands = loadCommands();
-    const categories = {};
-
     const cmdList = Array.isArray(commands)
       ? commands
       : (commands instanceof Map ? Array.from(commands.values()) : []);
 
     const seen = new Set();
+    const bucket = {
+      general: [], ai: [], admin: [], owner: [], media: [],
+      fun: [], utility: [], entertainment: [], textmaker: [], movies: [], other: []
+    };
+
     for (const cmd of cmdList) {
       if (!cmd?.name) continue;
       if (seen.has(cmd.name)) continue;
       seen.add(cmd.name);
 
       const cat = String(cmd.category || 'other').toLowerCase().trim();
-      if (!categories[cat]) categories[cat] = [];
-      categories[cat].push(cmd);
+      if (!bucket[cat]) bucket.other.push(cmd.name);
+      else bucket[cat].push(cmd.name);
     }
 
     const ownerNames = Array.isArray(config.ownerName) ? config.ownerName : [config.ownerName];
     const owner = ownerNames?.[0] || 'Infinity Team';
+
     const uptime = formatUptime(process.uptime());
     const ram = (process.memoryUsage().rss / 1024 / 1024).toFixed(2);
     const who = mentionTag(sender);
 
-    // detect submenu from ".menu admin" OR ".adminmenu"
-    const usedCommand = String(extra?.commandName || '').toLowerCase();
-    const subMenu =
-      (args[0] && String(args[0]).toLowerCase()) ||
-      (usedCommand.endsWith('menu') ? usedCommand : null);
+    let text =
+`╭━━『 ${String(config.botName || 'Infinity MD')} 』━━╮
 
-    // ------- MAIN MENU -------
-    if (!subMenu || subMenu === 'menu') {
-      const menuTextRaw =
-`╔══════════════════════╗
-║  🤖 ${botName.toUpperCase()}
-╠══════════════════════╣
-║ 👋 User    : ${who}
-║ 👑 Owner   : ${owner}
-║ ⚡ Prefix  : ${prefix}
-║ 📦 Cmds    : ${seen.size}
-║ ⏱ Uptime  : ${uptime}
-║ 🧠 RAM     : ${ram} MB
-╚══════════════════════╝
+👋 Hello ${who}!
 
-╭─────── MENU LIST ───────╮
-│ 🧭 ${prefix}generalmenu
-│ 🤖 ${prefix}aimenu
-│ 🛡️ ${prefix}adminmenu
-│ 👑 ${prefix}ownermenu
-│ 🎞️ ${prefix}dlmenu
-│ 🎭 ${prefix}funmenu
-│ 🔧 ${prefix}toolmenu
-│ 👾 ${prefix}entertainmentmenu
-│ 🖋 ${prefix}textmenu
-│ 🎬 ${prefix}moviemenu
-╰─────────────────────────╯
+⚡ Prefix: ${prefix}
+📦 Total Commands: ${seen.size}
+👑 Owner: ${owner}
+⏱ Uptime: ${uptime}
+🧠 RAM: ${ram} MB
+╰━━━━━━━━━━━━━━━━━
 
-📜 Full Commands: ${prefix}mainmenu`;
+`;
 
-      const caption = mono(menuTextRaw);
+    text += buildSection('🧭 GENERAL COMMAND', bucket.general, prefix);
+    text += buildSection('🤖 AI COMMAND', bucket.ai, prefix);
+    text += buildSection('🛡️ ADMIN COMMAND', bucket.admin, prefix);
+    text += buildSection('👑 OWNER COMMAND', bucket.owner, prefix);
+    text += buildSection('🎞️ MEDIA COMMAND', bucket.media, prefix);
+    text += buildSection('🎭 FUN COMMAND', bucket.fun, prefix);
+    text += buildSection('🔧 UTILITY COMMAND', bucket.utility, prefix);
+    text += buildSection('👾 ENTERTAINMENT COMMAND', bucket.entertainment, prefix);
+    text += buildSection('🖋️ TEXTMAKER COMMAND', bucket.textmaker, prefix);
+    text += buildSection('🎬 MOVIES COMMAND', bucket.movies, prefix);
+    if (bucket.other.length) text += buildSection('🧪 OTHER COMMAND', bucket.other, prefix);
 
-      const imgPath = pickMenuImage();
-      if (imgPath) {
-        const imageBuffer = fs.readFileSync(imgPath);
-        return sock.sendMessage(
-          chatId,
-          {
-            image: imageBuffer,
-            caption,
-            mentions: [sender],
-            contextInfo: {
-              forwardingScore: 1,
-              isForwarded: true,
-              forwardedNewsletterMessageInfo: {
-                newsletterJid: config.newsletterJid || '120363161513685998@newsletter',
-                newsletterName: config.botName || 'INFINITY MD',
-                serverMessageId: -1
-              }
-            }
-          },
-          { quoted: msg }
-        );
-      }
+    text += `╰━━━━━━━━━━━━━━━━━\n\n💡 Type ${prefix}help <command> for more info`;
 
-      return sock.sendMessage(
-        chatId,
-        {
-          text: caption,
-          mentions: [sender],
-          contextInfo: {
-            forwardingScore: 1,
-            isForwarded: true,
-            forwardedNewsletterMessageInfo: {
-              newsletterJid: config.newsletterJid || '120363161513685998@newsletter',
-              newsletterName: config.botName || 'INFINITY MD',
-              serverMessageId: -1
-            }
-          }
-        },
-        { quoted: msg }
-      );
-    }
-
-    // ------- SUBMENUS -------
-    let category = '';
-    let title = '';
-
-    switch (subMenu) {
-      case 'generalmenu':       category = 'general';       title = '🧭 GENERAL COMMANDS'; break;
-      case 'aimenu':            category = 'ai';            title = '🤖 AI COMMANDS'; break;
-      case 'adminmenu':         category = 'admin';         title = '🛡️ ADMIN COMMANDS'; break;
-      case 'ownermenu':         category = 'owner';         title = '👑 OWNER COMMANDS'; break;
-      case 'dlmenu':            category = 'media';         title = '🎞️ MEDIA COMMANDS'; break;
-      case 'funmenu':           category = 'fun';           title = '🎭 FUN COMMANDS'; break;
-      case 'toolmenu':          category = 'utility';       title = '🔧 UTILITY COMMANDS'; break;
-      case 'entertainmentmenu': category = 'entertainment'; title = '👾 ENTERTAINMENT COMMANDS'; break;
-      case 'textmenu':          category = 'textmaker';     title = '🖋️ TEXTMAKER COMMANDS'; break;
-      case 'moviemenu':         category = 'movies';        title = '🎬 MOVIES COMMANDS'; break;
-
-      // allow ".menu admin" style
-      case 'general':           category = 'general';       title = '🧭 GENERAL COMMANDS'; break;
-      case 'ai':                category = 'ai';            title = '🤖 AI COMMANDS'; break;
-      case 'admin':             category = 'admin';         title = '🛡️ ADMIN COMMANDS'; break;
-      case 'owner':             category = 'owner';         title = '👑 OWNER COMMANDS'; break;
-      case 'media':             category = 'media';         title = '🎞️ MEDIA COMMANDS'; break;
-      case 'fun':               category = 'fun';           title = '🎭 FUN COMMANDS'; break;
-      case 'utility':           category = 'utility';       title = '🔧 UTILITY COMMANDS'; break;
-      case 'entertainment':     category = 'entertainment'; title = '👾 ENTERTAINMENT COMMANDS'; break;
-      case 'textmaker':         category = 'textmaker';     title = '🖋️ TEXTMAKER COMMANDS'; break;
-      case 'movies':            category = 'movies';        title = '🎬 MOVIES COMMANDS'; break;
-
-      // back-compat
-      case 'animemenu':         category = 'entertainment'; title = '👾 ENTERTAINMENT COMMANDS'; break;
-      case 'toolsmenu':         category = 'utility';       title = '🔧 UTILITY COMMANDS'; break;
-
-      default:
-        return sock.sendMessage(chatId, { text: '❌ Invalid menu category!' }, { quoted: msg });
-    }
-
-    const list = categories[category] || [];
-    if (!list.length) {
-      return sock.sendMessage(
-        chatId,
-        { text: `❌ No commands found in ${title}\nTip: Your plugins must use category: "${category}"` },
-        { quoted: msg }
-      );
-    }
-
-    list.sort((a, b) => String(a.name).localeCompare(String(b.name)));
-
-    let body = '';
-    for (const cmd of list) body += `│ ➜ ${prefix}${cmd.name}\n`;
-
-    const submenuText =
-`${title}
-┌────────────────────────────────────────┐
-│ Total: ${list.length}
-└────────────────────────────────────────┘
-┌────────────────────────────────────────┐
-${body.trimEnd()}
-└────────────────────────────────────────┘
-Back → ${prefix}menu   |   Full → ${prefix}mainmenu`;
-
-    return sock.sendMessage(
-      chatId,
-      { text: mono(submenuText), mentions: [sender] },
-      { quoted: msg }
-    );
+    return sock.sendMessage(chatId, { text: mono(text), mentions: [sender] }, { quoted: msg });
   }
 };
