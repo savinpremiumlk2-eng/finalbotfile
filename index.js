@@ -1,6 +1,18 @@
-/**
- * WhatsApp MD-Style Multi-Command Bot with Baileys
- */
+// 👇 ADD THIS AT THE VERY TOP
+const express = require("express");
+const app = express();
+
+app.get("/", (req, res) => res.send("Infinity MD running ✅"));
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log("Web server listening on", PORT));
+
+
+// 👇 YOUR EXISTING BOT CODE BELOW
+require("./config");
+require("./settings");
+
+const { default: makeWASocket } = require("@whiskeysockets/baileys");
 const { 
     default: makeWASocket, 
     useMultiFileAuthState, 
