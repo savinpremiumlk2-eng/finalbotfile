@@ -1,0 +1,12 @@
+0000000000000000000000000000000000000000 24ecdfcd4dc55672442ec233279e2777012a6de4 iiii8898989 <52293453-iiii8898989@users.noreply.replit.com> 1771993502 +0000	branch: Created from origin/main
+24ecdfcd4dc55672442ec233279e2777012a6de4 24ecdfcd4dc55672442ec233279e2777012a6de4 iiii8898989 <52293453-iiii8898989@users.noreply.replit.com> 1771993502 +0000	checkout: moving from main to main
+24ecdfcd4dc55672442ec233279e2777012a6de4 91798b77dd36a7dc381eb940a947363f3a96bd7a iiii8898989 <52293453-iiii8898989@users.noreply.replit.com> 1771993774 +0000	commit: Enhance bot status display and update dependencies
+91798b77dd36a7dc381eb940a947363f3a96bd7a c57a218eaf31abd4aa71fb897185be7835747961 iiii8898989 <52293453-iiii8898989@users.noreply.replit.com> 1771994365 +0000	commit: Update bot commands and fix restarting issues
+c57a218eaf31abd4aa71fb897185be7835747961 4cb5182f307494e28b844142a864cea5af875127 iiii8898989 <52293453-iiii8898989@users.noreply.replit.com> 1771994596 +0000	commit: Update session and token files to maintain active connections
+4cb5182f307494e28b844142a864cea5af875127 a934a57c55a105a021225bec3b6a7681b75cc416 saviofficial <39753962-saviofficial@users.noreply.replit.com> 1771994866 +0000	commit: Improve menu and download commands with Infinity MD branding and functionality
+a934a57c55a105a021225bec3b6a7681b75cc416 a1bbe7759ecec65402b975e543435b3daabf77be saviofficial <39753962-saviofficial@users.noreply.replit.com> 1771995523 +0000	commit: Add movie downloaders and improve bot branding and menu functionality
+a1bbe7759ecec65402b975e543435b3daabf77be 62d518c0b4e89e39d6667ef0c22bf61ca1c1f01e saviofficial <39753962-saviofficial@users.noreply.replit.com> 1771995644 +0000	commit: Fix commands not working after recent update
+62d518c0b4e89e39d6667ef0c22bf61ca1c1f01e 10345ae6d51268467644c70211687a55938323b5 savinmyacc-debug <savinmyacc@gmai.com> 1771999055 +0530	commit: initial commit
+10345ae6d51268467644c70211687a55938323b5 0000000000000000000000000000000000000000 savinmyacc-debug <savinmyacc@gmai.com> 1771999055 +0530	Branch: renamed refs/heads/main to refs/heads/main
+10345ae6d51268467644c70211687a55938323b5 10345ae6d51268467644c70211687a55938323b5 savinmyacc-debug <savinmyacc@gmai.com> 1771999055 +0530	Branch: renamed refs/heads/main to refs/heads/main
+10345ae6d51268467644c70211687a55938323b5 06a60142c3a6a67807aa0d1415fd87924c994ae9 savinmyacc-debug <savinmyacc@gmai.com> 1771999229 +0530	commit: add .gitignore and remove junk/secrets
