@@ -1,13 +1,3 @@
-/**
- * ✅ .menu (SINGLE DESIGN + BANNER + FORWARDED STYLE)
- * - Uses ONLY the box design you provided
- * - Sends with banner image (random from utils/banners or utils/bot_image.jpg)
- * - Caption is monospace (perfect alignment)
- * - Keeps forwardedNewsletterMessageInfo (same as your old menu)
- *
- * Drop-in file: commands/general/menu.js
- */
-
 const config = require('../../config');
 const { loadCommands } = require('../../utils/commandLoader');
 const fs = require('fs');
@@ -26,7 +16,6 @@ function mentionTag(jid = '') {
 }
 
 function mono(txt) {
-  // WhatsApp monospace block for PERFECT alignment
   return '```' + '\n' + txt + '\n' + '```';
 }
 
@@ -49,14 +38,14 @@ function pickMenuImage() {
 module.exports = {
   name: 'menu',
   aliases: [
-    'help',
-    'commands',
-    'mainmenu', // optional shortcut
+    'help', 'commands',
     'ownermenu', 'adminmenu', 'dlmenu', 'funmenu', 'aimenu',
-    'entertainmentmenu', 'textmenu', 'toolmenu', 'moviemenu', 'generalmenu'
+    'entertainmentmenu', 'textmenu', 'toolmenu', 'moviemenu', 'generalmenu',
+    // back-compat
+    'animemenu', 'toolsmenu'
   ],
   category: 'general',
-  description: 'Show menu',
+  description: 'Show menu + submenus',
   usage: '.menu',
 
   async execute(sock, msg, args = [], extra = {}) {
@@ -66,32 +55,47 @@ module.exports = {
     const prefix = config.prefix || '.';
     const botName = String(config.botName || 'INFINITY MD');
 
-    // Count commands (dedupe by name)
+    // Load commands grouped by category
     const commands = loadCommands();
+    const categories = {};
+
     const cmdList = Array.isArray(commands)
       ? commands
       : (commands instanceof Map ? Array.from(commands.values()) : []);
 
-    const total = new Set(cmdList.map(c => c?.name).filter(Boolean)).size;
+    const seen = new Set();
+    for (const cmd of cmdList) {
+      if (!cmd?.name) continue;
+      if (seen.has(cmd.name)) continue;
+      seen.add(cmd.name);
 
-    // Owner name
+      const cat = String(cmd.category || 'other').toLowerCase().trim();
+      if (!categories[cat]) categories[cat] = [];
+      categories[cat].push(cmd);
+    }
+
     const ownerNames = Array.isArray(config.ownerName) ? config.ownerName : [config.ownerName];
     const owner = ownerNames?.[0] || 'Infinity Team';
-
-    // Stats
     const uptime = formatUptime(process.uptime());
     const ram = (process.memoryUsage().rss / 1024 / 1024).toFixed(2);
     const who = mentionTag(sender);
 
-    // ✅ YOUR ONE DESIGN (exact look, aligned)
-    const menuTextRaw =
+    // detect submenu from ".menu admin" OR ".adminmenu"
+    const usedCommand = String(extra?.commandName || '').toLowerCase();
+    const subMenu =
+      (args[0] && String(args[0]).toLowerCase()) ||
+      (usedCommand.endsWith('menu') ? usedCommand : null);
+
+    // ------- MAIN MENU -------
+    if (!subMenu || subMenu === 'menu') {
+      const menuTextRaw =
 `╔══════════════════════╗
 ║  🤖 ${botName.toUpperCase()}
 ╠══════════════════════╣
 ║ 👋 User    : ${who}
 ║ 👑 Owner   : ${owner}
 ║ ⚡ Prefix  : ${prefix}
-║ 📦 Cmds    : ${total}
+║ 📦 Cmds    : ${seen.size}
 ║ ⏱ Uptime  : ${uptime}
 ║ 🧠 RAM     : ${ram} MB
 ╚══════════════════════╝
@@ -111,18 +115,36 @@ module.exports = {
 
 📜 Full Commands: ${prefix}mainmenu`;
 
-    const caption = mono(menuTextRaw);
+      const caption = mono(menuTextRaw);
 
-    // ✅ Send with banner + forwarded style (same pattern as your old code)
-    const imgPath = pickMenuImage();
-    if (imgPath) {
-      const imageBuffer = fs.readFileSync(imgPath);
+      const imgPath = pickMenuImage();
+      if (imgPath) {
+        const imageBuffer = fs.readFileSync(imgPath);
+        return sock.sendMessage(
+          chatId,
+          {
+            image: imageBuffer,
+            caption,
+            mentions: [sender],
+            contextInfo: {
+              forwardingScore: 1,
+              isForwarded: true,
+              forwardedNewsletterMessageInfo: {
+                newsletterJid: config.newsletterJid || '120363161513685998@newsletter',
+                newsletterName: config.botName || 'INFINITY MD',
+                serverMessageId: -1
+              }
+            }
+          },
+          { quoted: msg }
+        );
+      }
+
       return sock.sendMessage(
         chatId,
         {
-          image: imageBuffer,
-          caption,
-          mentions: sender ? [sender] : [],
+          text: caption,
+          mentions: [sender],
           contextInfo: {
             forwardingScore: 1,
             isForwarded: true,
@@ -137,22 +159,69 @@ module.exports = {
       );
     }
 
-    // Fallback if no banner found
+    // ------- SUBMENUS -------
+    let category = '';
+    let title = '';
+
+    switch (subMenu) {
+      case 'generalmenu':       category = 'general';       title = '🧭 GENERAL COMMANDS'; break;
+      case 'aimenu':            category = 'ai';            title = '🤖 AI COMMANDS'; break;
+      case 'adminmenu':         category = 'admin';         title = '🛡️ ADMIN COMMANDS'; break;
+      case 'ownermenu':         category = 'owner';         title = '👑 OWNER COMMANDS'; break;
+      case 'dlmenu':            category = 'media';         title = '🎞️ MEDIA COMMANDS'; break;
+      case 'funmenu':           category = 'fun';           title = '🎭 FUN COMMANDS'; break;
+      case 'toolmenu':          category = 'utility';       title = '🔧 UTILITY COMMANDS'; break;
+      case 'entertainmentmenu': category = 'entertainment'; title = '👾 ENTERTAINMENT COMMANDS'; break;
+      case 'textmenu':          category = 'textmaker';     title = '🖋️ TEXTMAKER COMMANDS'; break;
+      case 'moviemenu':         category = 'movies';        title = '🎬 MOVIES COMMANDS'; break;
+
+      // allow ".menu admin" style
+      case 'general':           category = 'general';       title = '🧭 GENERAL COMMANDS'; break;
+      case 'ai':                category = 'ai';            title = '🤖 AI COMMANDS'; break;
+      case 'admin':             category = 'admin';         title = '🛡️ ADMIN COMMANDS'; break;
+      case 'owner':             category = 'owner';         title = '👑 OWNER COMMANDS'; break;
+      case 'media':             category = 'media';         title = '🎞️ MEDIA COMMANDS'; break;
+      case 'fun':               category = 'fun';           title = '🎭 FUN COMMANDS'; break;
+      case 'utility':           category = 'utility';       title = '🔧 UTILITY COMMANDS'; break;
+      case 'entertainment':     category = 'entertainment'; title = '👾 ENTERTAINMENT COMMANDS'; break;
+      case 'textmaker':         category = 'textmaker';     title = '🖋️ TEXTMAKER COMMANDS'; break;
+      case 'movies':            category = 'movies';        title = '🎬 MOVIES COMMANDS'; break;
+
+      // back-compat
+      case 'animemenu':         category = 'entertainment'; title = '👾 ENTERTAINMENT COMMANDS'; break;
+      case 'toolsmenu':         category = 'utility';       title = '🔧 UTILITY COMMANDS'; break;
+
+      default:
+        return sock.sendMessage(chatId, { text: '❌ Invalid menu category!' }, { quoted: msg });
+    }
+
+    const list = categories[category] || [];
+    if (!list.length) {
+      return sock.sendMessage(
+        chatId,
+        { text: `❌ No commands found in ${title}\nTip: Your plugins must use category: "${category}"` },
+        { quoted: msg }
+      );
+    }
+
+    list.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+
+    let body = '';
+    for (const cmd of list) body += `│ ➜ ${prefix}${cmd.name}\n`;
+
+    const submenuText =
+`${title}
+┌────────────────────────────────────────┐
+│ Total: ${list.length}
+└────────────────────────────────────────┘
+┌────────────────────────────────────────┐
+${body.trimEnd()}
+└────────────────────────────────────────┘
+Back → ${prefix}menu   |   Full → ${prefix}mainmenu`;
+
     return sock.sendMessage(
       chatId,
-      {
-        text: caption,
-        mentions: sender ? [sender] : [],
-        contextInfo: {
-          forwardingScore: 1,
-          isForwarded: true,
-          forwardedNewsletterMessageInfo: {
-            newsletterJid: config.newsletterJid || '120363161513685998@newsletter',
-            newsletterName: config.botName || 'INFINITY MD',
-            serverMessageId: -1
-          }
-        }
-      },
+      { text: mono(submenuText), mentions: [sender] },
       { quoted: msg }
     );
   }
