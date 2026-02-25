@@ -1,20 +1,18 @@
 /**
- * Cinesubz Auto-Send (NO LINKS • ALWAYS TRY SEND FILE)
- * ----------------------------------------------------
- * ✅ .cinesubz <name> -> shows ONLY 3 results
- * ✅ reply 1 / 2 / 3 -> bot auto-picks a default quality and AUTO sends the FILE
- * ✅ FIX: resolves “Go to download page” / landing pages to the REAL direct media URL
- * ✅ NO LINKS EVER: never sends URLs to chat (only files or an error message)
- * ✅ NO SEND LIMITS in code: it will download fully and try to send anyway
+ * FILM2 / Cinesubz Auto-Send (NO LINKS • ALWAYS TRY SEND FILE)
+ * ------------------------------------------------------------
+ * ✅ .film2 <name> -> shows ONLY 3 results
+ * ✅ reply 1 / 2 / 3 -> bot auto picks quality and AUTO sends the FILE
+ * ✅ FIX: resolves landing pages -> direct media URL
+ * ✅ NO LINKS EVER
+ * ✅ No hard size blocks (WhatsApp may still reject big uploads)
  *
- * ⚠️ Reality check:
- * WhatsApp still has its own upload limits. If the file is too big,
- * Baileys/WhatsApp will fail. This plugin will then show an error message (no links).
+ * NOTE:
+ * - Uses in-memory session Map (no DB/store needed, avoids store bugs)
+ * - Fixes file-type ESM issue via dynamic import
  */
 
 const axios = require('axios');
-const store = require('../lib/lightweight_store');
-const { fromBuffer } = require('file-type');
 const cheerio = require('cheerio');
 const fs = require('fs');
 const os = require('os');
@@ -23,7 +21,9 @@ const { URL } = require('url');
 
 const SRIHUB_API_KEY = 'dew_FEIXBd8x3XE6eshtBtM1NwEV5IxSLI6PeRE2zLmi';
 
-// ---------- text helpers ----------
+// ---- in-memory sessions: key = chatId|senderId ----
+const SESSIONS = new Map(); // { listMsgId, query, items, createdAt, timeout }
+
 function norm(s = '') {
   return String(s).toLowerCase().replace(/[\W_]+/g, ' ').trim();
 }
@@ -58,7 +58,6 @@ function isProbablyHtml(ctype, clen) {
 }
 
 function extractDirectMediaUrl(html, baseUrl) {
-  // direct .mp4/.mkv/.webm inside scripts/links
   const mediaMatch = html.match(/https?:\/\/[^'"\s>]+\.(?:mp4|mkv|webm)(\?[^'"\s>]*)?/gi);
   if (mediaMatch?.length) return mediaMatch[0];
 
@@ -78,11 +77,11 @@ function extractDirectMediaUrl(html, baseUrl) {
 function pickNextPageUrl(html, baseUrl) {
   const $ = cheerio.load(html);
 
-  // 1) anchor text that looks like “go to download page”
   const candidates = [];
   $('a[href]').each((_, el) => {
     const href = $(el).attr('href');
     if (!href) return;
+
     const txt = norm($(el).text());
     const cls = norm($(el).attr('class') || '');
     const id = norm($(el).attr('id') || '');
@@ -100,7 +99,6 @@ function pickNextPageUrl(html, baseUrl) {
     }
   });
 
-  // 2) onclick="location='...'"
   const onclick =
     $('a[onclick*="location"]').attr('onclick') ||
     $('button[onclick*="location"]').attr('onclick') ||
@@ -110,7 +108,6 @@ function pickNextPageUrl(html, baseUrl) {
     if (m?.[1]) candidates.unshift(m[1]);
   }
 
-  // 3) data-href
   const dataHref =
     $('a[data-href]').attr('data-href') ||
     $('button[data-href]').attr('data-href') ||
@@ -124,7 +121,6 @@ function pickNextPageUrl(html, baseUrl) {
 }
 
 async function probeStream(url, referer) {
-  // Use GET stream (HEAD often blocked)
   const res = await axios.get(url, {
     responseType: 'stream',
     timeout: 30000,
@@ -147,7 +143,6 @@ async function resolveToDirectUrl(startUrl, referer, maxHops = 7) {
     const clen = res.headers?.['content-length'] || '0';
     const ct = ctype.toLowerCase();
 
-    // if it’s a file-ish response
     if (
       ct.includes('video/') ||
       ct.includes('application/octet-stream') ||
@@ -159,7 +154,6 @@ async function resolveToDirectUrl(startUrl, referer, maxHops = 7) {
       return url;
     }
 
-    // HTML page -> read and hop
     if (isProbablyHtml(ctype, clen)) {
       res.data.destroy();
 
@@ -187,10 +181,9 @@ async function resolveToDirectUrl(startUrl, referer, maxHops = 7) {
         continue;
       }
 
-      throw new Error('Landing page detected but no direct media or download-page link found');
+      throw new Error('Landing page detected but no direct media or download link found');
     }
 
-    // unknown content-type -> assume direct
     res.data.destroy();
     return url;
   }
@@ -198,11 +191,11 @@ async function resolveToDirectUrl(startUrl, referer, maxHops = 7) {
   throw new Error('Could not resolve direct media URL (too many hops)');
 }
 
-// ---------- download to temp (NO size stops) ----------
+// ---------- download to temp ----------
 async function downloadToTemp(mediaUrl, referer) {
   const tmpFile = path.join(
     os.tmpdir(),
-    `cinesubz_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+    `film2_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
   );
 
   const res = await axios.get(mediaUrl, {
@@ -235,7 +228,6 @@ async function downloadToTemp(mediaUrl, referer) {
 
 // ---------- pick default quality ----------
 function parseQScore(quality = '', sizeStr = '') {
-  // default preference: 720 > 1080 > 480 > 360 > unknown
   const q = String(quality).toLowerCase();
   let s = 0;
   if (q.includes('720')) s += 60;
@@ -244,13 +236,10 @@ function parseQScore(quality = '', sizeStr = '') {
   else if (q.includes('360')) s += 35;
   else s += 20;
 
-  // Prefer “WEBRip / BluRay” words a tiny bit (optional)
   const st = (quality + ' ' + sizeStr).toLowerCase();
   if (st.includes('webrip')) s += 3;
   if (st.includes('bluray') || st.includes('blu-ray')) s += 3;
 
-  // If size is known and extremely huge, downscore slightly (still can be chosen)
-  // We do NOT block based on size.
   const m = String(sizeStr).match(/([\d.]+)\s*(gb|mb)/i);
   if (m) {
     const v = Number(m[1]);
@@ -272,38 +261,37 @@ function pickDefaultDownload(flatLinks) {
 
 // ---------- plugin ----------
 module.exports = {
-  command: 'cinesubz',
-  aliases: ['cinesub'],
+  command: 'film2',
+  aliases: ['cinesubz', 'cinesub'],
   category: 'movies',
-  description: 'Cinesubz: top 3 -> reply 1/2/3 -> auto fetch direct url -> download -> send file (NO links).',
-  usage: '.cinesubz <movie name>',
+  description: 'FILM2 (Cinesubz): top 3 -> reply 1/2/3 -> resolve -> download -> send file (NO links).',
+  usage: '.film2 <movie name>',
 
   async handler(sock, message, args, context = {}) {
     const chatId = context.chatId || message.key.remoteJid;
-    const senderId = message.key.participant || message.key.remoteJid;
+    const senderId = message.key.participant || message.key.remoteJid; // works in groups too
     const query = args.join(' ').trim();
+    const sessionKey = `${chatId}|${senderId}`;
 
-    const SESSION_KEY = `cinesubz_session_${chatId}_${senderId}`;
+    // ESM-safe import for file-type
+    const { fileTypeFromBuffer } = await import('file-type');
 
-    let listener = null;
-    let timer = null;
-
-    async function cleanup() {
-      try { if (timer) clearTimeout(timer); } catch {}
-      try { if (listener) sock.ev.off('messages.upsert', listener); } catch {}
-      try { await store.saveSetting(senderId, SESSION_KEY, null); } catch {}
+    async function clearSession() {
+      const s = SESSIONS.get(sessionKey);
+      if (s?.timeout) clearTimeout(s.timeout);
+      SESSIONS.delete(sessionKey);
     }
 
     try {
       if (!query) {
         return await sock.sendMessage(
           chatId,
-          { text: '*Please provide a movie name.*\nExample: .cinesubz Ne Zha' },
+          { text: '*Please provide a movie name.*\nExample: .film2 Ne Zha' },
           { quoted: message }
         );
       }
 
-      await sock.sendMessage(chatId, { text: '🔎 Searching Cinesubz (top 3)...' }, { quoted: message });
+      await sock.sendMessage(chatId, { text: '🔎 Searching (top 3)...' }, { quoted: message });
 
       const searchUrl = `https://api.srihub.store/movie/cinesubz?q=${encodeURIComponent(query)}&apikey=${SRIHUB_API_KEY}`;
       const res = await axios.get(searchUrl, { timeout: 25000 });
@@ -316,7 +304,7 @@ module.exports = {
       results = results.slice(0, 3);
 
       let caption =
-        `🎬 *Cinesubz (Top 3) for:* *${query}*\n\n` +
+        `🎬 *Top 3 for:* *${query}*\n\n` +
         `↩️ *Reply with 1 / 2 / 3 to download*\n\n`;
 
       results.forEach((item, i) => {
@@ -333,25 +321,37 @@ module.exports = {
         { quoted: message }
       );
 
-      await store.saveSetting(senderId, SESSION_KEY, {
-        listMsgId: sentListMsg.key.id,
-        query,
-        items: results.map(r => ({ title: r.title, link: r.link }))
-      });
-
-      timer = setTimeout(async () => {
-        await cleanup();
+      // store session (in memory)
+      await clearSession();
+      const timeout = setTimeout(async () => {
+        await clearSession();
         try {
-          await sock.sendMessage(chatId, { text: '⌛ Selection expired. Please run the command again.' }, { quoted: sentListMsg });
+          await sock.sendMessage(chatId, { text: '⌛ Selection expired. Run .film2 again.' }, { quoted: sentListMsg });
         } catch {}
       }, 5 * 60 * 1000);
 
-      listener = async ({ messages }) => {
+      SESSIONS.set(sessionKey, {
+        listMsgId: sentListMsg.key.id,
+        query,
+        items: results.map(r => ({ title: r.title, link: r.link })),
+        createdAt: Date.now(),
+        timeout
+      });
+
+      // listener (single-use)
+      const listener = async ({ messages }) => {
         const m = messages?.[0];
         if (!m?.message || m.key.remoteJid !== chatId) return;
+        if (m.key.fromMe) return;
 
         const ctx = m.message?.extendedTextMessage?.contextInfo;
-        if (!ctx?.stanzaId || ctx.stanzaId !== sentListMsg.key.id) return;
+        if (!ctx?.stanzaId) return;
+
+        const session = SESSIONS.get(sessionKey);
+        if (!session?.listMsgId) return;
+
+        // must reply to the exact list message
+        if (ctx.stanzaId !== session.listMsgId) return;
 
         const replyText = (m.message.conversation || m.message.extendedTextMessage?.text || '').trim();
         const choice = parseInt(replyText, 10);
@@ -359,27 +359,23 @@ module.exports = {
           return await sock.sendMessage(chatId, { text: '❌ Reply only with 1, 2, or 3.' }, { quoted: m });
         }
 
-        const session = await store.getSetting(senderId, SESSION_KEY);
-        if (!session?.items?.length) {
-          return await sock.sendMessage(chatId, { text: '❌ Session expired. Run the command again.' }, { quoted: m });
-        }
-
         const selected = session.items[choice - 1];
         if (!selected) return await sock.sendMessage(chatId, { text: '❌ Invalid selection.' }, { quoted: m });
 
+        // stop further replies for this session
+        sock.ev.off('messages.upsert', listener);
+
         await sock.sendMessage(chatId, { text: `ℹ️ Getting download options for *${selected.title}*...` }, { quoted: m });
 
-        // fetch download details
         const detailsUrl = `https://api.srihub.store/movie/cinesubzdl?url=${encodeURIComponent(selected.link)}&apikey=${SRIHUB_API_KEY}`;
         const dlRes = await axios.get(detailsUrl, { timeout: 25000 });
         const movie = dlRes.data?.result;
 
         if (!movie) {
-          await cleanup();
+          await clearSession();
           return await sock.sendMessage(chatId, { text: '❌ Failed to fetch download details.' }, { quoted: m });
         }
 
-        // flatten links
         const flatLinks = [];
         if (Array.isArray(movie.downloadOptions) && movie.downloadOptions.length > 0) {
           movie.downloadOptions.forEach(opt => {
@@ -398,13 +394,13 @@ module.exports = {
         }
 
         if (!flatLinks.length) {
-          await cleanup();
-          return await sock.sendMessage(chatId, { text: '❌ No downloadable files found for this movie.' }, { quoted: m });
+          await clearSession();
+          return await sock.sendMessage(chatId, { text: '❌ No downloadable files found.' }, { quoted: m });
         }
 
         const picked = pickDefaultDownload(flatLinks);
         if (!picked?.url) {
-          await cleanup();
+          await clearSession();
           return await sock.sendMessage(chatId, { text: '❌ Could not pick a download option.' }, { quoted: m });
         }
 
@@ -415,23 +411,19 @@ module.exports = {
         );
 
         try {
-          // 1) resolve landing pages to direct media url
           const directUrl = await resolveToDirectUrl(picked.url, selected.link, 7);
 
-          // 2) download to temp
           await sock.sendMessage(chatId, { text: '📦 Downloading movie file...' }, { quoted: m });
           const dl = await downloadToTemp(directUrl, selected.link);
 
-          // 3) detect type
           const headBuf = await readChunk(dl.tmpFile, 16384);
-          const type = await fromBuffer(headBuf);
+          const type = await fileTypeFromBuffer(headBuf);
 
           const title = safeFileName(movie.title || selected.title || session.query, 'movie');
           const qTag = safeFileName(picked.quality || 'default', 'default').replace(/\s+/g, '');
           const ext = type?.ext || 'mp4';
           const fileName = `${title}_${qTag}.${ext}`;
 
-          // 4) send as DOCUMENT (no links)
           await sock.sendMessage(
             chatId,
             {
@@ -447,12 +439,11 @@ module.exports = {
           );
 
           try { fs.unlinkSync(dl.tmpFile); } catch {}
-          await cleanup();
+          await clearSession();
         } catch (e) {
-          await cleanup();
+          await clearSession();
           const msg = String(e?.message || e || 'Unknown error');
 
-          // NO LINKS: only send error message
           return await sock.sendMessage(
             chatId,
             {
@@ -468,13 +459,8 @@ module.exports = {
 
       sock.ev.on('messages.upsert', listener);
     } catch (err) {
-      console.error('❌ Cinesubz Auto-Send Error:', err?.message || err);
-      try { await cleanup(); } catch {}
-      await sock.sendMessage(
-        chatId,
-        { text: '❌ Failed to process request. Please try again later.' },
-        { quoted: message }
-      );
+      console.error('❌ FILM2 Error:', err?.message || err);
+      try { await sock.sendMessage(chatId, { text: '❌ Failed. Check logs / try again.' }, { quoted: message }); } catch {}
     }
   }
 };
