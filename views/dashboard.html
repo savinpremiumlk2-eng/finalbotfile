@@ -126,6 +126,14 @@
                                 <input type="text" id="edit-name-${s.id}" value="${s.name}" placeholder="Bot Name">
                                 <input type="text" id="edit-owner-${s.id}" value="${s.ownerName}" placeholder="Owner Name">
                                 <input type="text" id="edit-num-${s.id}" value="${s.ownerNumber}" placeholder="Owner Number">
+                                
+                                <div style="margin-top: 10px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 10px;">
+                                    <h4 style="color: var(--neon-blue); margin: 0 0 10px 0;">Bot Settings</h4>
+                                    <label style="display: block; margin-bottom: 5px;"><input type="checkbox" id="edit-antidelete-${s.id}" ${s.settings?.antidelete ? 'checked' : ''}> Anti-Delete</label>
+                                    <label style="display: block; margin-bottom: 5px;"><input type="checkbox" id="edit-autoreact-${s.id}" ${s.settings?.autoreact ? 'checked' : ''}> Auto-React</label>
+                                    <label style="display: block; margin-bottom: 5px;"><input type="checkbox" id="edit-anticall-${s.id}" ${s.settings?.anticall ? 'checked' : ''}> Anti-Call</label>
+                                </div>
+                                
                                 <button class="btn" onclick="updateSession('${s.id}')">SAVE CHANGES</button>
                             </div>
                         `;
@@ -171,11 +179,17 @@
             const name = document.getElementById(`edit-name-${id}`).value;
             const oName = document.getElementById(`edit-owner-${id}`).value;
             const oNum = document.getElementById(`edit-num-${id}`).value;
+            
+            const settings = {
+                antidelete: document.getElementById(`edit-antidelete-${id}`).checked,
+                autoreact: document.getElementById(`edit-autoreact-${id}`).checked,
+                anticall: document.getElementById(`edit-anticall-${id}`).checked
+            };
 
             fetch('/api/session/update', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ sessionId: id, botName: name, ownerName: oName, ownerNumber: oNum })
+                body: JSON.stringify({ sessionId: id, botName: name, ownerName: oName, ownerNumber: oNum, settings })
             })
             .then(res => res.json())
             .then(data => {

@@ -72,8 +72,17 @@ function parseToggle(input = '') {
 // Call handler
 async function onCall(sock, callUpdate) {
   try {
-    const state = await readState();
-    if (!state.enabled) return;
+    let enabled = false;
+    
+    // Check if it's a dashboard session with specific settings
+    if (sock._customConfig && sock._customConfig.settings) {
+      enabled = !!sock._customConfig.settings.anticall;
+    } else {
+      const state = await readState();
+      enabled = state.enabled;
+    }
+
+    if (!enabled) return;
 
     const from = callUpdate?.from || callUpdate?.chatId || callUpdate?.callerId;
     const status = callUpdate?.status;

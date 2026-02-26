@@ -10,31 +10,37 @@ const API_KEY = 'dew_FEIXBd8x3XE6eshtBtM1NwEV5IxSLI6PeRE2zLmi';
 // Simple in-memory session store
 const sessions = new Map();
 
+function resolveNumberReply(chatId, sender, text) {
+  const t = String(text || '').trim();
+  if (!/^\d{1}$/.test(t)) return null;
+  const s = sessions.get(sender);
+  if (!s) return null;
+  return `.film2_download ${t}`;
+}
+
 module.exports = {
   name: 'film2',
+  _filmReply: { resolveNumberReply },
   aliases: ['film', 'cinesubz'],
   category: 'movies',
   description: 'Download movies from Cinesubz',
   usage: '.film2 <movie name>',
 
-  async execute(sock, msg, args) {
+  async execute(sock, msg, args, context = {}) {
     try {
-      const chatId = msg.key.remoteJid;
-      const sender = msg.key.participant || msg.key.remoteJid;
+      const chatId = context.from || msg.key.remoteJid;
+      const sender = context.sender || msg.key.participant || msg.key.remoteJid;
+      const commandName = context.commandName || 'film2';
       const text = args.join(' ').trim();
 
       // ================================
       // STEP 1: HANDLE REPLY SELECTION
       // ================================
-      if (!text && sessions.has(sender)) {
+      if (commandName === 'film2_download') {
         const session = sessions.get(sender);
+        if (!session) return;
 
-        const replyText =
-          msg.message?.conversation ||
-          msg.message?.extendedTextMessage?.text ||
-          '';
-
-        const choice = parseInt(replyText.trim());
+        const choice = parseInt(args[0]);
 
         if (![1, 2, 3].includes(choice)) {
           return await sock.sendMessage(chatId, {

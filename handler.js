@@ -408,6 +408,13 @@ const handleMessage = async (sock, msg) => {
     delete require.cache[require.resolve('./config')];
     const config = require('./config');
     const globalSettings = require('./database').getGlobalSettings();
+    
+    // Merge global settings with session specific settings
+    const sessionSettings = sock._customConfig?.settings || {};
+    const effectiveSettings = {
+      ...globalSettings,
+      ...sessionSettings
+    };
 
     // Maintenance Mode Check
     if (globalSettings.maintenance && !isOwner(sender, sock)) {
@@ -416,7 +423,7 @@ const handleMessage = async (sock, msg) => {
 
     // Auto-React System
     try {
-      const autoReactEnabled = globalSettings.autoReact || config.autoReact;
+      const autoReactEnabled = effectiveSettings.autoReact || config.autoReact;
       if (autoReactEnabled && msg.message && !msg.key.fromMe) {
         const content = msg.message.ephemeralMessage?.message || msg.message;
         const text =
@@ -493,7 +500,7 @@ const handleMessage = async (sock, msg) => {
     }
     
     // Anti-Delete System
-    if (globalSettings.antidelete && msg.message?.protocolMessage?.type === 0) {
+    if (effectiveSettings.antidelete && msg.message?.protocolMessage?.type === 0) {
        const key = msg.message.protocolMessage.key;
        const deletedMsg = await database.getDeletedMessage(key.id);
        if (deletedMsg) {
@@ -505,7 +512,7 @@ const handleMessage = async (sock, msg) => {
     }
     
     // Store message for anti-delete
-    if (globalSettings.antidelete && !msg.key.fromMe && !isSystemJid(from)) {
+    if (effectiveSettings.antidelete && !msg.key.fromMe && !isSystemJid(from)) {
        // body is not defined yet here, let's fix the order or get it
        let msgBody = '';
        if (content.conversation) msgBody = content.conversation;
@@ -555,28 +562,16 @@ const handleMessage = async (sock, msg) => {
         const resolvedYt = ytModule._ytReply.resolveNumberReply(from, sender, body);
         if (resolvedYt) {
           // If it's a numeric reply for YT, we handle it as a command
-          const args = resolvedYt.split(' ');
-          const cmdName = args.shift().replace(config.prefix, '');
-          const command = commands.get(cmdName);
-          if (command) {
-            const executeFn = command.handler || command.execute;
-            if (executeFn) {
-              await executeFn(sock, msg, args, {
-                from,
-                sender,
-                isGroup,
-                groupMetadata,
-                isOwner: isOwner(sender),
-                isAdmin: await isAdmin(sock, sender, from, groupMetadata),
-                isBotAdmin: await isBotAdmin(sock, from, groupMetadata),
-                isMod: isMod(sender),
-                commandName: cmdName,
-                reply: (text) => sock.sendMessage(from, { text }, { quoted: msg }),
-                react: (emoji) => sock.sendMessage(from, { react: { text: emoji, key: msg.key } })
-              });
-              return;
-            }
-          }
+          body = resolvedYt;
+        }
+      }
+
+      // Film2 Numeric Reply
+      const film2Module = require('./commands/movies/film2');
+      if (film2Module._filmReply) {
+        const resolvedFilm = film2Module._filmReply.resolveNumberReply(from, sender, body);
+        if (resolvedFilm) {
+          body = resolvedFilm;
         }
       }
     } catch (e) {

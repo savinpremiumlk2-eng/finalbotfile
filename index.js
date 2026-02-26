@@ -48,21 +48,21 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'views/dashboard.ht
 app.get('/api/sessions', (req, res) => {
   try {
     const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
-    const sessionList = Object.keys(sessions).map(id => ({
+    res.json(Object.keys(sessions).map(id => ({
       id,
       name: sessions[id].name,
       ownerName: sessions[id].ownerName || config.ownerName[0],
       ownerNumber: sessions[id].ownerNumber || config.ownerNumber[0],
+      settings: sessions[id].settings || {},
       status: activeSessions.has(id) ? 'Online' : 'Offline'
-    }));
-    res.json(sessionList);
+    })));
   } catch (e) {
     res.json([]);
   }
 });
 
 app.post('/api/session/update', express.json(), async (req, res) => {
-  const { sessionId, botName, ownerName, ownerNumber } = req.body;
+  const { sessionId, botName, ownerName, ownerNumber, settings } = req.body;
   if (!sessionId) return res.status(400).send('Missing session ID');
   
   try {
@@ -71,6 +71,7 @@ app.post('/api/session/update', express.json(), async (req, res) => {
       sessions[sessionId].name = botName || sessions[sessionId].name;
       sessions[sessionId].ownerName = ownerName || sessions[sessionId].ownerName;
       sessions[sessionId].ownerNumber = ownerNumber || sessions[sessionId].ownerNumber;
+      sessions[sessionId].settings = settings || sessions[sessionId].settings || {};
 
       // Update active socket config if session is online
       if (activeSessions.has(sessionId)) {
@@ -78,7 +79,8 @@ app.post('/api/session/update', express.json(), async (req, res) => {
         sock._customConfig = {
           botName: sessions[sessionId].name,
           ownerName: sessions[sessionId].ownerName,
-          ownerNumber: sessions[sessionId].ownerNumber
+          ownerNumber: sessions[sessionId].ownerNumber,
+          settings: sessions[sessionId].settings
         };
       }
 
@@ -185,8 +187,20 @@ async function connectSession(id, sessionData) {
   newSock._customConfig = {
      botName: sessionData.name || 'Infinity MD',
      ownerName: sessionData.ownerName || config.ownerName[0],
-     ownerNumber: sessionData.ownerNumber || config.ownerNumber[0]
+     ownerNumber: sessionData.ownerNumber || config.ownerNumber[0],
+     settings: sessionData.settings || {}
   };
+
+  new_sock.ev.on('call', async (callUpdate) => {
+    try {
+      const anticall = require('./commands/owner/anticall');
+      if (anticall && typeof anticall.onCall === 'function') {
+        await anticall.onCall(newSock, callUpdate);
+      }
+    } catch (e) {
+      console.error('Call handling error:', e);
+    }
+  });
 
   newSock.ev.on('creds.update', saveCreds);
   newSock.ev.on('connection.update', async (update) => {
