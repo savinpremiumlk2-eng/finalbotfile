@@ -8,14 +8,11 @@ const {
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
-  makeCacheableSignalKeyStore
+  makeCacheableSignalKeyStore,
 } = require('@whiskeysockets/baileys');
 
-// AntiCall module
-const anticall = require('./commands/owner/anticall');
-
 /**
- * Infinity MD - Full working index.js with AntiCall support
+ * Infinity MD - Render Web Service Stable Entry
  */
 
 const app = express();
@@ -64,14 +61,10 @@ app.get('/api/sessions', (req, res) => {
   }
 });
 
-// Express JSON parser middleware
-app.use(express.json());
-
-// Session management endpoints
-app.post('/api/session/update', async (req, res) => {
+app.post('/api/session/update', express.json(), async (req, res) => {
   const { sessionId, botName, ownerName, ownerNumber } = req.body;
   if (!sessionId) return res.status(400).send('Missing session ID');
-
+  
   try {
     const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
     if (sessions[sessionId]) {
@@ -79,6 +72,7 @@ app.post('/api/session/update', async (req, res) => {
       sessions[sessionId].ownerName = ownerName || sessions[sessionId].ownerName;
       sessions[sessionId].ownerNumber = ownerNumber || sessions[sessionId].ownerNumber;
 
+      // Update active socket config if session is online
       if (activeSessions.has(sessionId)) {
         const sock = activeSessions.get(sessionId);
         sock._customConfig = {
@@ -98,14 +92,14 @@ app.post('/api/session/update', async (req, res) => {
   }
 });
 
-app.post('/api/session/delete', async (req, res) => {
+app.post('/api/session/delete', express.json(), async (req, res) => {
   const { sessionId } = req.body;
   if (!sessionId) return res.status(400).send('Missing session ID');
 
   try {
     const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
     const sessionData = sessions[sessionId];
-
+    
     if (activeSessions.has(sessionId)) {
       const sock = activeSessions.get(sessionId);
       sock.ev.removeAllListeners('connection.update');
@@ -117,7 +111,9 @@ app.post('/api/session/delete', async (req, res) => {
 
     if (sessionData) {
       const sessionFolder = path.join(__dirname, 'session', sessionData.folder);
-      if (fs.existsSync(sessionFolder)) fs.rmSync(sessionFolder, { recursive: true, force: true });
+      if (fs.existsSync(sessionFolder)) {
+        fs.rmSync(sessionFolder, { recursive: true, force: true });
+      }
       delete sessions[sessionId];
       fs.writeFileSync(sessionsDbPath, JSON.stringify(sessions, null, 2));
     }
@@ -128,7 +124,7 @@ app.post('/api/session/delete', async (req, res) => {
   }
 });
 
-app.post('/api/session/restart', async (req, res) => {
+app.post('/api/session/restart', express.json(), async (req, res) => {
   const { sessionId } = req.body;
   if (!sessionId) return res.status(400).send('Missing session ID');
 
@@ -153,128 +149,203 @@ app.post('/api/session/restart', async (req, res) => {
 
 async function connectSession(id, sessionData) {
   const sessionFolder = path.join(__dirname, 'session', sessionData.folder);
-  if (!fs.existsSync(sessionFolder)) fs.mkdirSync(sessionFolder, { recursive: true });
+  
+  // Ensure session folder exists
+  if (!fs.existsSync(sessionFolder)) {
+    fs.mkdirSync(sessionFolder, { recursive: true });
+  }
+
+  // Handle KnightBot! session ID decoding if needed
+  if (id && id.startsWith('KnightBot!')) {
+    try {
+      const zlib = require('zlib');
+      const b64data = id.split('!')[1];
+      const decoded = zlib.gunzipSync(Buffer.from(b64data, 'base64'));
+      fs.writeFileSync(path.join(sessionFolder, 'creds.json'), decoded);
+    } catch (e) {
+      console.error(`Error decoding KnightBot session ${id}:`, e.message);
+    }
+  }
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionFolder);
   const { version } = await fetchLatestBaileysVersion();
 
-  const sock = makeWASocket({
+  const newSock = makeWASocket({
     version,
     logger,
     auth: {
       creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, logger)
+      keys: makeCacheableSignalKeyStore(state.keys, logger),
     },
     browser: [sessionData.name || 'Infinity MD', 'Chrome', '1.0.0'],
     syncFullHistory: false,
-    markOnlineOnConnect: true
+    markOnlineOnConnect: true,
   });
 
-  sock._customConfig = {
-    botName: sessionData.name || 'Infinity MD',
-    ownerName: sessionData.ownerName || config.ownerName[0],
-    ownerNumber: sessionData.ownerNumber || config.ownerNumber[0]
+  newSock._customConfig = {
+     botName: sessionData.name || 'Infinity MD',
+     ownerName: sessionData.ownerName || config.ownerName[0],
+     ownerNumber: sessionData.ownerNumber || config.ownerNumber[0]
   };
 
-  // Save credentials
-  sock.ev.on('creds.update', saveCreds);
-
-  // Connection updates
-  sock.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
+  newSock.ev.on('creds.update', saveCreds);
+  newSock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect } = update;
     if (connection === 'open') {
-      activeSessions.set(id, sock);
+      activeSessions.set(id, newSock);
       console.log(`✅ Session ${id} connected!`);
     }
     if (connection === 'close') {
-      const code = lastDisconnect?.error?.output?.statusCode || DisconnectReason.restartRequired;
-      activeSessions.delete(id);
-      console.log(`❌ Session ${id} disconnected (code: ${code})`);
-      setTimeout(() => connectSession(id, sessionData), 5000);
+      const statusCode = (lastDisconnect?.error instanceof Boom)
+        ? lastDisconnect.error.output?.statusCode
+        : lastDisconnect?.error?.output?.statusCode;
+      
+      const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
+      const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
+      const isDeleted = !sessions[id] && id !== config.sessionID;
+
+      if (isLoggedOut || isDeleted) {
+        activeSessions.delete(id);
+        console.log(`❌ Session ${id} stopped (${isLoggedOut ? 'Logged out' : 'Deleted'})`);
+      } else {
+        console.log(`🔄 Reconnecting session ${id} (Status: ${statusCode})...`);
+        setTimeout(() => connectSession(id, sessionData), 5000);
+      }
     }
   });
 
-  // Messages handler
-  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+  newSock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
     for (const msg of messages) {
       if (!msg?.message) continue;
-      try { await handler.handleMessage(sock, msg); } catch (err) { console.error(err); }
+      try { await handler.handleMessage(newSock, msg); } catch (err) { console.error('Handler Error:', err); }
     }
   });
-
-  // AntiCall handler
-  sock.ev.on('call', async (calls) => {
-    for (const c of calls) await anticall.onCall(sock, c);
-  });
-
-  activeSessions.set(id, sock);
-  return sock;
 }
 
-app.post('/api/session/add', async (req, res) => {
+app.post('/api/session/add', express.json(), async (req, res) => {
   const { sessionId, botName, ownerName, ownerNumber } = req.body;
   if (!sessionId) return res.status(400).send('Missing session ID');
-
+  
   try {
     const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
-    const sessionFolder = `session_${Date.now()}`;
-    sessions[sessionId] = {
-      folder: sessionFolder,
+    const sessionName = sessions[sessionId]?.folder || `session_${Date.now()}`;
+    const sessionFolder = path.join(__dirname, 'session', sessionName);
+    
+    sessions[sessionId] = { 
+      folder: sessionName, 
       name: botName || 'Infinity MD',
       ownerName: ownerName || config.ownerName[0],
       ownerNumber: ownerNumber || config.ownerNumber[0]
     };
     fs.writeFileSync(sessionsDbPath, JSON.stringify(sessions, null, 2));
 
+    if (sessionId.startsWith('KnightBot!')) {
+      const zlib = require('zlib');
+      const b64data = sessionId.split('!')[1];
+      const decoded = zlib.gunzipSync(Buffer.from(b64data, 'base64'));
+      if (!fs.existsSync(sessionFolder)) fs.mkdirSync(sessionFolder, { recursive: true });
+      fs.writeFileSync(path.join(sessionFolder, 'creds.json'), decoded);
+    }
+
     await connectSession(sessionId, sessions[sessionId]);
     res.json({ success: true });
-  } catch (e) {
-    console.error('Session add error:', e);
-    res.status(500).send(e.message);
+  } catch (error) {
+    console.error('Session Add Error:', error);
+    res.status(500).send(error.message);
   }
 });
 
-// Global settings endpoints
-app.get('/api/global-settings', (req, res) => res.json(database.getGlobalSettings()));
-app.post('/api/global-settings/update', async (req, res) => {
+app.get('/api/global-settings', (req, res) => {
+  res.json(database.getGlobalSettings());
+});
+
+app.post('/api/global-settings/update', express.json(), async (req, res) => {
   const settings = req.body;
   database.updateGlobalSettings(settings);
-
+  
+  // Notify all active sessions
+  const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
   for (const [id, sock] of activeSessions.entries()) {
-    const jid = sessions[id]?.ownerNumber ? `${sessions[id].ownerNumber}@s.whatsapp.net` : config.ownerNumber[0] + '@s.whatsapp.net';
-    try { await sock.sendMessage(jid, { text: '⚙️ Global settings updated.' }); } catch {} 
+    let targetNum = '';
+    if (id === config.sessionID) {
+      targetNum = config.ownerNumber[0];
+    } else if (sessions[id]) {
+      targetNum = sessions[id].ownerNumber;
+    }
+    
+    if (targetNum) {
+      const jid = targetNum.includes('@') ? targetNum : `${targetNum}@s.whatsapp.net`;
+      const msg = `⚙️ *Global Settings Updated*\n\n` + 
+                  Object.entries(settings).map(([k, v]) => `• ${k}: ${v ? 'ON' : 'OFF'}`).join('\n') +
+                  `\n\n_Changes applied instantly._`;
+      try { 
+        await sock.sendMessage(jid, { text: msg });
+        console.log(`Sent update message to owner ${targetNum} for session ${id}`);
+      } catch (e) {
+        console.error(`Failed to send update message to owner ${targetNum}:`, e.message);
+      }
+    }
   }
+  
   res.json({ success: true });
 });
 
-// Stats endpoint
 app.get('/api/stats', (req, res) => {
   const uptime = process.uptime();
   const h = Math.floor(uptime / 3600);
   const m = Math.floor((uptime % 3600) / 60);
   const s = Math.floor(uptime % 60);
-  res.json({ uptime: `${h}h ${m}m ${s}s`, ram: (process.memoryUsage().rss / 1024 / 1024).toFixed(2) });
+  res.json({
+    uptime: `${h}h ${m}m ${s}s`,
+    ram: (process.memoryUsage().rss / 1024 / 1024).toFixed(2)
+  });
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Web server listening on ${PORT}`));
+app.listen(PORT, () => console.log('Web server listening on', PORT));
 
-// Initialize all saved sessions
-(async function initAllSessions() {
+// Main Bot logic
+let sock = null;
+let reconnectTimer = null;
+let isConnecting = false;
+let backoffMs = 5000;
+const BACKOFF_MAX = 60000;
+
+// Re-initialize all saved sessions on startup
+async function initAllSessions() {
   try {
     const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
     for (const id in sessions) {
+      console.log(`♻️ Auto-reconnecting session: ${id}`);
       await connectSession(id, sessions[id]);
     }
+
+    // Connect global session from config if it exists and isn't in dashboard sessions
     if (config.sessionID && !sessions[config.sessionID]) {
-      await connectSession(config.sessionID, {
-        folder: 'session',
-        name: config.botName || 'Infinity MD',
-        ownerName: config.ownerName[0],
-        ownerNumber: config.ownerNumber[0]
-      });
+       console.log('♻️ Connecting global session from config.js');
+       const globalSessionData = {
+         folder: config.sessionName || 'session',
+         name: config.botName || 'Infinity MD (Global)',
+         ownerName: config.ownerName[0],
+         ownerNumber: config.ownerNumber[0]
+       };
+       await connectSession(config.sessionID, globalSessionData);
     }
   } catch (e) {
-    console.error('Init sessions error:', e);
+    console.error('Init Sessions Error:', e);
   }
-})();
+}
+
+initAllSessions();
+
+function clearReconnectTimer() {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+}
+
+function safeEndSocket() {
+  try { if (sock) sock.end?.(); } catch (_) {} finally { sock = null; }
+}
