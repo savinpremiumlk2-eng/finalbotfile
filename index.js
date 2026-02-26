@@ -196,6 +196,9 @@ async function connectSession(id, sessionData) {
      settings: sessionData.settings || {}
   };
 
+  newSock.ev.on('creds.update', saveCreds);
+  
+  // Anti-Call Listener
   newSock.ev.on('call', async (callUpdate) => {
     try {
       const anticall = require('./commands/owner/anticall');
@@ -207,7 +210,6 @@ async function connectSession(id, sessionData) {
     }
   });
 
-  newSock.ev.on('creds.update', saveCreds);
   newSock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect } = update;
     if (connection === 'open') {

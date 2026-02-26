@@ -407,7 +407,7 @@ const handleMessage = async (sock, msg) => {
     // Clear cache to get fresh config values
     delete require.cache[require.resolve('./config')];
     const config = require('./config');
-    const globalSettings = require('./database').getGlobalSettings();
+    const globalSettings = database.getGlobalSettings();
     
     // Merge global settings with session specific settings
     const sessionSettings = sock._customConfig?.settings || {};
@@ -415,6 +415,8 @@ const handleMessage = async (sock, msg) => {
       ...globalSettings,
       ...sessionSettings
     };
+
+    const sender = msg.key.fromMe ? sock.user.id.split(':')[0] + '@s.whatsapp.net' : msg.key.participant || msg.key.remoteJid;
 
     // Maintenance Mode Check
     if (globalSettings.maintenance && !isOwner(sender, sock)) {
@@ -473,7 +475,6 @@ const handleMessage = async (sock, msg) => {
     const messageType = actualMessageTypes[0];
     
     // from already defined above in DM block check
-    const sender = msg.key.fromMe ? sock.user.id.split(':')[0] + '@s.whatsapp.net' : msg.key.participant || msg.key.remoteJid;
     const isGroup = from.endsWith('@g.us'); // Should always be true now due to DM block above
     
     // Fetch group metadata immediately if it's a group
