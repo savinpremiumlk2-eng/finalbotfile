@@ -26,6 +26,7 @@ module.exports = {
     const chatId = context.chatId || message.key.remoteJid;
     const senderId = message.key.participant || message.key.remoteJid;
     const query = args.join(' ').trim();
+    if (query.startsWith(config.prefix)) return; // prevent loop
     const sessionKey = `${chatId}|${senderId}`;
 
     const sendText = (text, quoted = message) =>

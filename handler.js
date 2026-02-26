@@ -471,13 +471,31 @@ const handleMessage = async (sock, msg) => {
     // Return early for non-group messages with no recognizable content
     if (!content || actualMessageTypes.length === 0) return;
     
+    // Get message body from unwrapped content
+    let body = '';
+    if (content.conversation) {
+      body = content.conversation;
+    } else if (content.extendedTextMessage) {
+      body = content.extendedTextMessage.text || '';
+    } else if (content.imageMessage) {
+      body = content.imageMessage.caption || '';
+    } else if (content.videoMessage) {
+      body = content.videoMessage.caption || '';
+    }
+    
+    body = (body || '').trim();
+
     // Check for numeric replies (Submenu Navigation)
-    const { _menuReply } = require('./commands/general/menu');
-    if (_menuReply) {
-      const resolvedCmd = _menuReply.resolveNumberReply(from, sender, body);
-      if (resolvedCmd) {
-        body = resolvedCmd;
+    try {
+      const { _menuReply } = require('./commands/general/menu');
+      if (_menuReply) {
+        const resolvedCmd = _menuReply.resolveNumberReply(from, sender, body);
+        if (resolvedCmd) {
+          body = resolvedCmd;
+        }
       }
+    } catch (e) {
+      console.error('Menu reply error:', e.message);
     }
 
     // Command Parser
@@ -513,22 +531,12 @@ const handleMessage = async (sock, msg) => {
           console.error(`Error executing command ${commandName}:`, error);
         }
         return;
+      } else {
+        // Not a recognized command, but has prefix. 
+        // Silently return to avoid sending error messages for non-commands.
+        return;
       }
     }
-    
-    // Get message body from unwrapped content
-    let body = '';
-    if (content.conversation) {
-      body = content.conversation;
-    } else if (content.extendedTextMessage) {
-      body = content.extendedTextMessage.text || '';
-    } else if (content.imageMessage) {
-      body = content.imageMessage.caption || '';
-    } else if (content.videoMessage) {
-      body = content.videoMessage.caption || '';
-    }
-    
-    body = (body || '').trim();
     
     // Check antiall protection (owner only feature)
     if (isGroup) {

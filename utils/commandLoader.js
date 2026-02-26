@@ -25,8 +25,9 @@ const loadCommands = () => {
       files.forEach(file => {
         try {
           const command = require(path.join(categoryPath, file));
-          if (command.name) {
-            commands.set(command.name, command);
+          const cmdName = command.name || command.command;
+          if (cmdName) {
+            commands.set(cmdName, command);
             if (command.aliases) {
               command.aliases.forEach(alias => {
                 commands.set(alias, command);
