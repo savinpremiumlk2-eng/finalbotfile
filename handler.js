@@ -487,7 +487,8 @@ const handleMessage = async (sock, msg) => {
 
     // Check for numeric replies (Submenu Navigation)
     try {
-      const { _menuReply } = require('./commands/general/menu');
+      const menuModule = require('./commands/general/menu');
+      const _menuReply = menuModule._menuReply;
       if (_menuReply) {
         const resolvedCmd = _menuReply.resolveNumberReply(from, sender, body);
         if (resolvedCmd) {
@@ -510,6 +511,9 @@ const handleMessage = async (sock, msg) => {
       if (command) {
         // Execute command
         try {
+          // React with loading emoji
+          await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } });
+
           // Check for handler (some use handler, some use execute)
           const executeFn = command.handler || command.execute;
           if (executeFn) {
@@ -526,9 +530,17 @@ const handleMessage = async (sock, msg) => {
               reply: (text) => sock.sendMessage(from, { text }, { quoted: msg }),
               react: (emoji) => sock.sendMessage(from, { react: { text: emoji, key: msg.key } })
             });
+
+            // React with done emoji after success
+            await sock.sendMessage(from, { react: { text: '✅', key: msg.key } });
+          } else {
+             // Fallback if no execute function found
+             await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
           }
         } catch (error) {
           console.error(`Error executing command ${commandName}:`, error);
+          // React with error emoji
+          await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
         }
         return;
       } else {

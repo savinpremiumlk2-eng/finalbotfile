@@ -1,4 +1,5 @@
 const axios = require('axios');
+const config = require('../../config');
 
 // ✅ API inside plugin (as you requested)
 const API_KEY = 'qasim-dev';
