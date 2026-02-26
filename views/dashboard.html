@@ -54,12 +54,30 @@
             </div>
         </div>
 
+        <div class="session-card">
+            <h3 style="color: var(--neon-pink);">Global Bot Settings</h3>
+            <div style="display: flex; flex-wrap: wrap; gap: 20px;" id="globalSettings">
+                <label><input type="checkbox" id="set-maintenance" style="width: auto;"> Maintenance Mode</label>
+                <label><input type="checkbox" id="set-forceBot" style="width: auto;"> Force Bot Mode</label>
+                <label><input type="checkbox" id="set-antidelete" style="width: auto;"> Anti-Delete</label>
+                <button class="btn" onclick="saveGlobalSettings()" style="margin-left: auto;">UPDATE SETTINGS</button>
+            </div>
+        </div>
+
         <h2 style="font-family: 'Orbitron'; color: var(--neon-pink); margin-top: 40px;">Active Bot Sessions</h2>
         <div id="sessionsList" class="sessions-grid"></div>
     </div>
 
     <script>
         function loadSessions() {
+            fetch('/api/global-settings')
+                .then(res => res.json())
+                .then(settings => {
+                    document.getElementById('set-maintenance').checked = settings.maintenance;
+                    document.getElementById('set-forceBot').checked = settings.forceBot;
+                    document.getElementById('set-antidelete').checked = settings.antidelete;
+                });
+
             fetch('/api/sessions')
                 .then(res => res.json())
                 .then(data => {
@@ -95,6 +113,19 @@
                         list.appendChild(card);
                     });
                 });
+        }
+
+        function saveGlobalSettings() {
+            const settings = {
+                maintenance: document.getElementById('set-maintenance').checked,
+                forceBot: document.getElementById('set-forceBot').checked,
+                antidelete: document.getElementById('set-antidelete').checked
+            };
+            fetch('/api/global-settings/update', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(settings)
+            }).then(() => alert('Global settings updated and owners notified!'));
         }
 
         function toggleEdit(id) {

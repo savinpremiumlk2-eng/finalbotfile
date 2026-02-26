@@ -243,6 +243,36 @@ app.post('/api/session/add', express.json(), async (req, res) => {
   }
 });
 
+app.get('/api/global-settings', (req, res) => {
+  res.json(database.getGlobalSettings());
+});
+
+app.post('/api/global-settings/update', express.json(), async (req, res) => {
+  const settings = req.body;
+  database.updateGlobalSettings(settings);
+  
+  // Notify all active sessions
+  const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
+  for (const [id, sock] of activeSessions.entries()) {
+    let targetNum = '';
+    if (id === config.sessionID) {
+      targetNum = config.ownerNumber[0];
+    } else if (sessions[id]) {
+      targetNum = sessions[id].ownerNumber;
+    }
+    
+    if (targetNum) {
+      const jid = targetNum.includes('@') ? targetNum : `${targetNum}@s.whatsapp.net`;
+      const msg = `⚙️ *Global Settings Updated*\n\n` + 
+                  Object.entries(settings).map(([k, v]) => `• ${k}: ${v ? 'ON' : 'OFF'}`).join('\n') +
+                  `\n\n_Changes applied instantly._`;
+      try { await sock.sendMessage(jid, { text: msg }); } catch (e) {}
+    }
+  }
+  
+  res.json({ success: true });
+});
+
 app.get('/api/stats', (req, res) => {
   const uptime = process.uptime();
   const h = Math.floor(uptime / 3600);

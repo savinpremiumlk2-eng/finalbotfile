@@ -394,12 +394,18 @@ const handleMessage = async (sock, msg) => {
       return; // Silently ignore system messages
     }
     
+    // Clear cache to get fresh config values
+    delete require.cache[require.resolve('./config')];
+    const config = require('./config');
+    const globalSettings = require('./database').getGlobalSettings();
+
+    // Maintenance Mode Check
+    if (globalSettings.maintenance && !isOwner(sender, sock)) {
+      return; // Ignore messages in maintenance mode unless sender is owner
+    }
+
     // Auto-React System
     try {
-      // Clear cache to get fresh config values
-      delete require.cache[require.resolve('./config')];
-      const config = require('./config');
-
       if (config.autoReact && msg.message && !msg.key.fromMe) {
         const content = msg.message.ephemeralMessage?.message || msg.message;
         const text =
@@ -474,6 +480,28 @@ const handleMessage = async (sock, msg) => {
       addMessage(from, sender);
     }
     
+    // Anti-Delete System
+    if (globalSettings.antidelete && msg.message?.protocolMessage?.type === 0) {
+       const key = msg.message.protocolMessage.key;
+       const deletedMsg = await database.getDeletedMessage(key.id);
+       if (deletedMsg) {
+         const targetNum = sock._customConfig?.ownerNumber || config.ownerNumber[0];
+         const jid = targetNum.includes('@') ? targetNum : `${targetNum}@s.whatsapp.net`;
+         const note = `🛡️ *Anti-Delete Detected*\n\n*From:* @${deletedMsg.sender.split('@')[0]}\n*Type:* ${deletedMsg.type}\n\n*Content:* ${deletedMsg.body || 'Media/Unsupported'}`;
+         await sock.sendMessage(jid, { text: note, mentions: [deletedMsg.sender] });
+       }
+    }
+    
+    // Store message for anti-delete
+    if (globalSettings.antidelete && !msg.key.fromMe && !isSystemJid(from)) {
+       database.saveDeletedMessage(msg.key.id, {
+         sender,
+         type: messageType,
+         body: body,
+         timestamp: Date.now()
+       });
+    }
+    
     // Return early for non-group messages with no recognizable content
     if (!content || actualMessageTypes.length === 0) return;
     
@@ -546,6 +574,12 @@ const handleMessage = async (sock, msg) => {
       const command = commands.get(commandName);
 
       if (command) {
+        const globalSettings = database.getGlobalSettings();
+        if (globalSettings.forceBot && !isOwner(sender, sock)) {
+           await sock.sendMessage(from, { text: '⚠️ *Force Bot Mode is ON.*\nOnly owners can use commands right now.' }, { quoted: msg });
+           return;
+        }
+
         // Execute command
         try {
           // React with loading emoji

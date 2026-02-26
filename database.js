@@ -24,10 +24,16 @@ const initDB = (filePath, defaultData = {}) => {
   }
 };
 
+const GLOBAL_SETTINGS = path.join(DB_PATH, 'global.json');
 initDB(GROUPS_DB, {});
 initDB(USERS_DB, {});
 initDB(WARNINGS_DB, {});
 initDB(MODS_DB, { moderators: [] });
+initDB(GLOBAL_SETTINGS, { 
+  maintenance: false, 
+  forceBot: false, 
+  antidelete: false 
+});
 
 // Read database
 const readDB = (filePath) => {
@@ -38,6 +44,17 @@ const readDB = (filePath) => {
     console.error(`Error reading database: ${error.message}`);
     return {};
   }
+};
+
+// Global Settings
+const getGlobalSettings = () => {
+  return readDB(GLOBAL_SETTINGS);
+};
+
+const updateGlobalSettings = (settings) => {
+  const current = readDB(GLOBAL_SETTINGS);
+  const updated = { ...current, ...settings };
+  return writeDB(GLOBAL_SETTINGS, updated);
 };
 
 // Write database
@@ -162,6 +179,19 @@ const isModerator = (userId) => {
   return mods.includes(userId);
 };
 
+// Anti-Delete Storage (In-memory cache for performance)
+const deletedMessagesCache = new Map();
+
+const saveDeletedMessage = (id, data) => {
+  deletedMessagesCache.set(id, data);
+  // Auto-clear after 1 hour to prevent memory bloat
+  setTimeout(() => deletedMessagesCache.delete(id), 3600000);
+};
+
+const getDeletedMessage = (id) => {
+  return deletedMessagesCache.get(id);
+};
+
 module.exports = {
   getGroupSettings,
   updateGroupSettings,
@@ -174,5 +204,9 @@ module.exports = {
   getModerators,
   addModerator,
   removeModerator,
-  isModerator
+  isModerator,
+  getGlobalSettings,
+  updateGlobalSettings,
+  saveDeletedMessage,
+  getDeletedMessage
 };
