@@ -22,40 +22,105 @@
         }
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
         header { text-align: center; padding: 50px 0; border-bottom: 2px solid var(--neon-blue); margin-bottom: 40px; }
-        h1 { font-family: 'Orbitron', sans-serif; font-size: 3rem; color: var(--neon-blue); text-shadow: 0 0 10px var(--neon-blue); }
-        .session-card { background: var(--card-bg); border: 1px solid var(--neon-blue); padding: 20px; margin-bottom: 20px; border-radius: 5px; }
-        .btn { background: var(--neon-blue); color: black; border: none; padding: 10px 20px; cursor: pointer; font-family: 'Orbitron'; font-weight: bold; }
-        input { background: #111; border: 1px solid var(--neon-blue); color: white; padding: 10px; width: 300px; margin-right: 10px; }
+        h1 { font-family: 'Orbitron', sans-serif; font-size: 3rem; color: var(--neon-blue); text-shadow: 0 0 10px var(--neon-blue); margin:0;}
+        .session-card { background: var(--card-bg); border: 1px solid var(--neon-blue); padding: 20px; margin-bottom: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,243,255,0.1); }
+        .btn { background: var(--neon-blue); color: black; border: none; padding: 10px 20px; cursor: pointer; font-family: 'Orbitron'; font-weight: bold; border-radius: 3px; transition: 0.3s; }
+        .btn:hover { background: var(--neon-pink); box-shadow: 0 0 15px var(--neon-pink); color: white; }
+        input { background: #111; border: 1px solid var(--neon-blue); color: white; padding: 10px; width: 300px; margin: 5px; border-radius: 3px; }
+        .status-badge { padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; margin-left: 10px; }
+        .online { background: #00ff00; color: black; }
+        .offline { background: #ff0000; color: white; }
+        .sessions-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>INFINITY MD</h1>
-            <p>MULTI-DEVICE SESSION MANAGER</p>
+            <p>ADVANCED WHATSAPP MULTI-DEVICE SYSTEM</p>
         </header>
 
         <div class="session-card">
-            <h3>Add New Session</h3>
-            <input type="text" id="sessionId" placeholder="Enter Session ID (KnightBot!...)">
-            <button class="btn" onclick="addSession()">CONNECT DEVICE</button>
+            <h3>Add New Bot</h3>
+            <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+                <input type="text" id="botName" placeholder="Custom Bot Name (e.g. My Helper)">
+                <input type="text" id="sessionId" placeholder="Session ID (KnightBot!...)">
+                <button class="btn" onclick="addSession()">DEPLOY BOT</button>
+            </div>
         </div>
 
-        <div id="sessionsList">
-            <!-- Active sessions will appear here -->
+        <h2 style="font-family: 'Orbitron'; color: var(--neon-pink);">Active Bot Sessions</h2>
+        <div id="sessionsList" class="sessions-grid">
+            <!-- Sessions load here -->
         </div>
     </div>
 
     <script>
+        function loadSessions() {
+            fetch('/api/sessions')
+                .then(res => res.json())
+                .then(data => {
+                    const list = document.getElementById('sessionsList');
+                    list.innerHTML = data.length ? '' : '<p>No bots deployed yet.</p>';
+                    data.forEach(s => {
+                        const card = document.createElement('div');
+                        card.className = 'session-card';
+                        card.innerHTML = `
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <strong style="font-size: 1.2rem; color: var(--neon-blue);">${s.name}</strong>
+                                    <span class="status-badge ${s.status.toLowerCase()}">${s.status}</span>
+                                </div>
+                                <button class="btn" onclick="reconnect('${s.id}')">RESTART</button>
+                            </div>
+                            <p style="font-size: 0.8rem; color: #888; margin-top: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ID: ${s.id}</p>
+                        `;
+                        list.appendChild(card);
+                    });
+                });
+        }
+
         function addSession() {
             const id = document.getElementById('sessionId').value;
-            if(!id) return alert('Enter ID');
+            const name = document.getElementById('botName').value;
+            if(!id) return alert('Session ID is required');
+            
+            // Show loading state
+            const btn = document.querySelector('.btn');
+            const originalText = btn.innerText;
+            btn.innerText = 'DEPLOYING...';
+            btn.disabled = true;
+
+            fetch('/api/session/add', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ sessionId: id, botName: name })
+            }).then(res => {
+                if(res.ok) {
+                    alert('Bot deployment initiated!');
+                    location.reload();
+                } else {
+                    alert('Failed to add session. Check if ID is valid.');
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                }
+            }).catch(err => {
+                alert('Network error: ' + err.message);
+                btn.innerText = originalText;
+                btn.disabled = false;
+            });
+        }
+
+        function reconnect(id) {
             fetch('/api/session/add', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ sessionId: id })
             }).then(() => location.reload());
         }
+
+        setInterval(loadSessions, 10000);
+        loadSessions();
     </script>
 </body>
 </html>
