@@ -515,10 +515,12 @@ const handleMessage = async (sock, msg) => {
     if (effectiveSettings.antidelete && !msg.key.fromMe && !isSystemJid(from)) {
        // body is not defined yet here, let's fix the order or get it
        let msgBody = '';
-       if (content.conversation) msgBody = content.conversation;
-       else if (content.extendedTextMessage) msgBody = content.extendedTextMessage.text || '';
-       else if (content.imageMessage) msgBody = content.imageMessage.caption || '';
-       else if (content.videoMessage) msgBody = content.videoMessage.caption || '';
+       if (content) {
+         if (content.conversation) msgBody = content.conversation;
+         else if (content.extendedTextMessage) msgBody = content.extendedTextMessage.text || '';
+         else if (content.imageMessage) msgBody = content.imageMessage.caption || '';
+         else if (content.videoMessage) msgBody = content.videoMessage.caption || '';
+       }
 
        database.saveDeletedMessage(msg.key.id, {
          sender,

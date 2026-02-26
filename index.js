@@ -20,6 +20,11 @@ const logger = pino({ level: 'silent' });
 const activeSessions = new Map();
 const sessionsDbPath = path.join(__dirname, 'database', 'sessions.json');
 
+// Ensure session directory exists
+if (!fs.existsSync(path.join(__dirname, 'session'))) {
+  fs.mkdirSync(path.join(__dirname, 'session'), { recursive: true });
+}
+
 // Ensure database directory exists
 if (!fs.existsSync(path.join(__dirname, 'database'))) {
   fs.mkdirSync(path.join(__dirname, 'database'), { recursive: true });
@@ -191,7 +196,7 @@ async function connectSession(id, sessionData) {
      settings: sessionData.settings || {}
   };
 
-  new_sock.ev.on('call', async (callUpdate) => {
+  newSock.ev.on('call', async (callUpdate) => {
     try {
       const anticall = require('./commands/owner/anticall');
       if (anticall && typeof anticall.onCall === 'function') {
