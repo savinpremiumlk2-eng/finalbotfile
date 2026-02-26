@@ -136,6 +136,24 @@ app.post('/api/session/restart', express.json(), async (req, res) => {
 
 async function connectSession(id, sessionData) {
   const sessionFolder = path.join(__dirname, 'session', sessionData.folder);
+  
+  // Ensure session folder exists
+  if (!fs.existsSync(sessionFolder)) {
+    fs.mkdirSync(sessionFolder, { recursive: true });
+  }
+
+  // Handle KnightBot! session ID decoding if needed
+  if (id && id.startsWith('KnightBot!')) {
+    try {
+      const zlib = require('zlib');
+      const b64data = id.split('!')[1];
+      const decoded = zlib.gunzipSync(Buffer.from(b64data, 'base64'));
+      fs.writeFileSync(path.join(sessionFolder, 'creds.json'), decoded);
+    } catch (e) {
+      console.error(`Error decoding KnightBot session ${id}:`, e.message);
+    }
+  }
+
   const { state, saveCreds } = await useMultiFileAuthState(sessionFolder);
   const { version } = await fetchLatestBaileysVersion();
 
@@ -170,11 +188,14 @@ async function connectSession(id, sessionData) {
         : lastDisconnect?.error?.output?.statusCode;
       
       const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
-      if (statusCode === DisconnectReason.loggedOut || !sessions[id]) {
+      const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
+      const isDeleted = !sessions[id] && id !== config.sessionID;
+
+      if (isLoggedOut || isDeleted) {
         activeSessions.delete(id);
-        console.log(`❌ Session ${id} stopped (Logged out or Deleted)`);
+        console.log(`❌ Session ${id} stopped (${isLoggedOut ? 'Logged out' : 'Deleted'})`);
       } else {
-        console.log(`🔄 Reconnecting session ${id}...`);
+        console.log(`🔄 Reconnecting session ${id} (Status: ${statusCode})...`);
         setTimeout(() => connectSession(id, sessionData), 5000);
       }
     }
@@ -251,6 +272,18 @@ async function initAllSessions() {
       console.log(`♻️ Auto-reconnecting session: ${id}`);
       await connectSession(id, sessions[id]);
     }
+
+    // Connect global session from config if it exists and isn't in dashboard sessions
+    if (config.sessionID && !sessions[config.sessionID]) {
+       console.log('♻️ Connecting global session from config.js');
+       const globalSessionData = {
+         folder: config.sessionName || 'session',
+         name: config.botName || 'Infinity MD (Global)',
+         ownerName: config.ownerName[0],
+         ownerNumber: config.ownerNumber[0]
+       };
+       await connectSession(config.sessionID, globalSessionData);
+    }
   } catch (e) {
     console.error('Init Sessions Error:', e);
   }
@@ -265,81 +298,6 @@ function clearReconnectTimer() {
   }
 }
 
-function scheduleReconnect(reasonMsg = '') {
-  clearReconnectTimer();
-  if (isConnecting) return;
-  const wait = backoffMs;
-  backoffMs = Math.min(Math.round(backoffMs * 2), BACKOFF_MAX);
-  console.log(`🔁 Reconnecting in ${Math.round(wait / 1000)}s... ${reasonMsg}`);
-  reconnectTimer = setTimeout(() => {
-    startBot().catch((e) => console.error('Start Error:', e));
-  }, wait);
-}
-
 function safeEndSocket() {
   try { if (sock) sock.end?.(); } catch (_) {} finally { sock = null; }
 }
-
-async function startBot() {
-  if (isConnecting) return sock;
-  isConnecting = true;
-  clearReconnectTimer();
-
-  try {
-    const sessionFolder = `./${config.sessionName}`;
-    if (config.sessionID && config.sessionID.startsWith('KnightBot!')) {
-        const zlib = require('zlib');
-        const b64data = config.sessionID.split('!')[1];
-        const decoded = zlib.gunzipSync(Buffer.from(b64data, 'base64'));
-        if (!fs.existsSync(sessionFolder)) fs.mkdirSync(sessionFolder, { recursive: true });
-        fs.writeFileSync(path.join(sessionFolder, 'creds.json'), decoded);
-    }
-
-    const { state, saveCreds } = await useMultiFileAuthState(sessionFolder);
-    const { version } = await fetchLatestBaileysVersion();
-    safeEndSocket();
-
-    sock = makeWASocket({
-      version,
-      logger,
-      auth: {
-        creds: state.creds,
-        keys: makeCacheableSignalKeyStore(state.keys, logger),
-      },
-      browser: ['Infinity MD', 'Chrome', '1.0.0'],
-      syncFullHistory: false,
-      markOnlineOnConnect: true,
-    });
-
-    sock.ev.on('creds.update', saveCreds);
-    sock.ev.on('connection.update', (update) => {
-      const { connection, lastDisconnect } = update;
-      if (connection === 'open') {
-        backoffMs = 5000;
-        console.log('\n✅ Infinity MD connected successfully!');
-      }
-      if (connection === 'close') {
-        const statusCode = (lastDisconnect?.error instanceof Boom)
-          ? lastDisconnect.error.output?.statusCode
-          : lastDisconnect?.error?.output?.statusCode;
-        const loggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
-        safeEndSocket();
-        if (!loggedOut) scheduleReconnect();
-      }
-    });
-
-    sock.ev.on('messages.upsert', async ({ messages, type }) => {
-      if (type !== 'notify') return;
-      for (const msg of messages) {
-        if (!msg?.message) continue;
-        try { await handler.handleMessage(sock, msg); } catch (err) { console.error('Handler Error:', err); }
-      }
-    });
-
-    return sock;
-  } finally {
-    isConnecting = false;
-  }
-}
-
-startBot().catch((err) => console.error('Start Error:', err));
