@@ -1,138 +1,141 @@
 /**
- * Infinity MD - AntiCall Plugin
- * Fully Fixed Version
+ * AntiCall Command - Owner Only
+ * -----------------------------
+ * Path: commands/owner/anticall.js
+ * Usage: .anticall on/off/status
+ * Function: Auto-reject + auto-block incoming calls
  */
 
 const fs = require('fs');
 const path = require('path');
 
-const DATA_PATH = path.join(process.cwd(), 'data');
-const FILE_PATH = path.join(DATA_PATH, 'anticall.json');
+const DATA_DIR = path.join(process.cwd(), 'data');
+const ANTICALL_PATH = path.join(DATA_DIR, 'anticall.json');
 
-// Ensure data folder exists
-function ensureDataFolder() {
-  if (!fs.existsSync(DATA_PATH)) {
-    fs.mkdirSync(DATA_PATH, { recursive: true });
-  }
+// In-memory cache
+let CACHE = { enabled: false, loadedAt: 0 };
+const CACHE_TTL_MS = 10000;
+
+function ensureDataDir() {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// Read state
-function getState() {
+function safeJsonParse(text, fallback = {}) {
   try {
-    ensureDataFolder();
-    if (!fs.existsSync(FILE_PATH)) return false;
-    const data = JSON.parse(fs.readFileSync(FILE_PATH));
-    return !!data.enabled;
+    if (!text) return fallback;
+    return JSON.parse(text);
   } catch {
-    return false;
+    return fallback;
   }
 }
 
-// Save state
-function setState(value) {
+async function readState(force = false) {
   try {
-    ensureDataFolder();
-    fs.writeFileSync(FILE_PATH, JSON.stringify({ enabled: !!value }, null, 2));
+    const now = Date.now();
+    if (!force && now - CACHE.loadedAt < CACHE_TTL_MS) return { ...CACHE };
+
+    ensureDataDir();
+    let enabled = false;
+    if (fs.existsSync(ANTICALL_PATH)) {
+      const raw = fs.readFileSync(ANTICALL_PATH, 'utf8');
+      const data = safeJsonParse(raw, {});
+      enabled = !!data.enabled;
+    }
+    CACHE = { enabled, loadedAt: now };
+    return { enabled };
+  } catch {
+    return { enabled: !!CACHE.enabled };
+  }
+}
+
+async function writeState(enabled) {
+  try {
+    ensureDataDir();
+    fs.writeFileSync(ANTICALL_PATH, JSON.stringify({ enabled: !!enabled }, null, 2));
+    CACHE = { enabled: !!enabled, loadedAt: Date.now() };
     return true;
   } catch (e) {
-    console.error('Anticall save error:', e);
+    console.error('Error writing anticall state:', e);
     return false;
   }
 }
 
-// Parse user input
-function parseInput(input = '') {
-  const s = input.toLowerCase().trim();
-  if (['on', 'enable', '1', 'true', 'yes'].includes(s)) return true;
-  if (['off', 'disable', '0', 'false', 'no'].includes(s)) return false;
-  if (['status'].includes(s)) return 'status';
-  return null;
+function parseToggle(input = '') {
+  const s = String(input).trim().toLowerCase();
+  if (!s) return { type: 'help' };
+  if (['status', 'st'].includes(s)) return { type: 'status' };
+  if (['on', 'enable', 'enabled', '1', 'true', 'yes', 'y'].includes(s)) return { type: 'set', value: true };
+  if (['off', 'disable', 'disabled', '0', 'false', 'no', 'n'].includes(s)) return { type: 'set', value: false };
+  return { type: 'help' };
+}
+
+// Call handler
+async function onCall(sock, callUpdate) {
+  try {
+    const state = await readState();
+    if (!state.enabled) return;
+
+    const from = callUpdate?.from || callUpdate?.chatId || callUpdate?.callerId;
+    const status = callUpdate?.status;
+    const isIncoming = status === 'offer' || status === 'ringing' || !!from;
+
+    if (!isIncoming || !from) return;
+
+    // Reject call
+    try {
+      if (typeof sock.rejectCall === 'function') {
+        await sock.rejectCall(callUpdate.id || callUpdate.callId, from);
+      }
+    } catch {}
+
+    // Block caller
+    try {
+      if (typeof sock.updateBlockStatus === 'function') {
+        await sock.updateBlockStatus(from, 'block');
+      }
+    } catch {}
+  } catch (e) {
+    console.error('AntiCall onCall error:', e);
+  }
 }
 
 module.exports = {
   name: 'anticall',
   aliases: ['acall', 'callblock'],
   category: 'owner',
-  description: 'Auto reject & block WhatsApp calls',
-  usage: '.anticall on/off/status',
+  description: 'Enable/disable auto-reject + auto-block incoming calls',
+  usage: '.anticall <on|off|status>',
   ownerOnly: true,
 
-  async execute(sock, msg, args) {
-    const chatId = msg.key.remoteJid;
-    const input = args[0];
+  async execute(sock, message, args, context = {}) {
+    const chatId = context.chatId || message.key.remoteJid;
+    const subRaw = args.join(' ').trim();
+    const parsed = parseToggle(subRaw);
+    const state = await readState(true);
 
-    if (!input) {
+    if (parsed.type === 'help') {
       return await sock.sendMessage(chatId, {
-        text:
-          `📵 *ANTICALL SETTINGS*\n\n` +
-          `Usage:\n` +
-          `.anticall on\n` +
-          `.anticall off\n` +
-          `.anticall status`
-      }, { quoted: msg });
+        text: `*📵 ANTICALL SETTINGS*\n\n` +
+              'Usage: `.anticall on/off/status`\n' +
+              `Current: ${state.enabled ? '✅ ENABLED' : '❌ DISABLED'}`
+      }, { quoted: message });
     }
 
-    const parsed = parseInput(input);
-
-    if (parsed === 'status') {
-      const enabled = getState();
+    if (parsed.type === 'status') {
       return await sock.sendMessage(chatId, {
-        text:
-          `📵 *Anticall Status*\n\n` +
-          `Current: ${enabled ? '✅ ENABLED' : '❌ DISABLED'}`
-      }, { quoted: msg });
+        text: `📵 *Anticall Status*\nCurrent: ${state.enabled ? '✅ ENABLED' : '❌ DISABLED'}`
+      }, { quoted: message });
     }
 
-    if (parsed === null) {
-      return await sock.sendMessage(chatId, {
-        text: '❌ Invalid option. Use on/off/status.'
-      }, { quoted: msg });
-    }
-
-    const saved = setState(parsed);
-
+    const ok = await writeState(parsed.value);
+    const newState = await readState(true);
     return await sock.sendMessage(chatId, {
-      text:
-        `📵 *Anticall ${parsed ? 'ENABLED' : 'DISABLED'}*\n\n` +
-        (saved
-          ? parsed
-            ? '✅ Incoming calls will now be rejected & blocked.'
-            : '❌ Incoming calls are now allowed.'
-          : '⚠️ Failed to save setting.')
-    }, { quoted: msg });
+      text: `📵 Anticall ${newState.enabled ? 'ENABLED' : 'DISABLED'}${ok ? '' : ' ⚠️ Failed to save'}`
+    }, { quoted: message });
   },
 
-  // ==============================
-  // 🔥 THIS IS THE IMPORTANT PART
-  // ==============================
-  async onCall(sock, call) {
-    try {
-      const enabled = getState();
-      if (!enabled) return;
-
-      const callerId = call.from || call.chatId || call.callerId;
-      const callId = call.id || call.callId;
-
-      if (!callerId) return;
-
-      console.log('📵 Blocking call from:', callerId);
-
-      // Reject call
-      if (typeof sock.rejectCall === 'function') {
-        try {
-          await sock.rejectCall(callId, callerId);
-        } catch {}
-      }
-
-      // Block user
-      if (typeof sock.updateBlockStatus === 'function') {
-        try {
-          await sock.updateBlockStatus(callerId, 'block');
-        } catch {}
-      }
-
-    } catch (err) {
-      console.error('Anticall onCall error:', err);
-    }
-  }
+  // Export for main bot to use in sock.ev.on('call', ...)
+  readState,
+  writeState,
+  onCall
 };
