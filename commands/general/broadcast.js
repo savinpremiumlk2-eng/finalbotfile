@@ -3,7 +3,10 @@
 // Command: .broadcast <message>
 // Aliases: .brodcast, .bc
 
-const isOwnerOrSudo = require('../lib/isOwner'); // adjust path/name if different
+const isOwnerOrSudo = async (number) => {
+  const config = require('../../config');
+  return config.ownerNumber.some(owner => owner.includes(number));
+};
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 

@@ -32,7 +32,7 @@ function safeText(s = '') {
 module.exports = {
   command: 'sticker',
   aliases: ['stpack', 'stickers'],
-  category: 'sticker',
+  category: 'utility',
   description: 'Search sticker packs and send stickers (from API).',
   usage: '.sticker <query> [startIndex]',
 

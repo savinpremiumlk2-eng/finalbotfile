@@ -11,7 +11,18 @@
 // ✅ Minimal web server (required for Render Web Service)
 const express = require('express');
 const app = express();
-app.get('/', (req, res) => res.status(200).send('Infinity MD running ✅'));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'views/dashboard.html')));
+app.get('/api/stats', (req, res) => {
+  const uptime = process.uptime();
+  const h = Math.floor(uptime / 3600);
+  const m = Math.floor((uptime % 3600) / 60);
+  const s = Math.floor(uptime % 60);
+  res.setHeader('Content-Type', 'application/json');
+  res.send(JSON.stringify({
+    uptime: `${h}h ${m}m ${s}s`,
+    ram: (process.memoryUsage().rss / 1024 / 1024).toFixed(2)
+  }));
+});
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log('Web server listening on', PORT));
 

@@ -471,65 +471,46 @@ const handleMessage = async (sock, msg) => {
     // Return early for non-group messages with no recognizable content
     if (!content || actualMessageTypes.length === 0) return;
     
-    // 🔹 Button response should also check unwrapped content
-    const btn = content.buttonsResponseMessage || msg.message?.buttonsResponseMessage;
-    if (btn) {
-      const buttonId = btn.selectedButtonId;
-      const displayText = btn.selectedDisplayText;
-      
-      // Handle button clicks by routing to commands
-      if (buttonId === 'btn_menu') {
-        // Execute menu command
-        const menuCmd = commands.get('menu');
-        if (menuCmd) {
-          await menuCmd.execute(sock, msg, [], {
-            from,
-            sender,
-            isGroup,
-            groupMetadata,
-            isOwner: isOwner(sender),
-            isAdmin: await isAdmin(sock, sender, from, groupMetadata),
-            isBotAdmin: await isBotAdmin(sock, from, groupMetadata),
-            isMod: isMod(sender),
-            reply: (text) => sock.sendMessage(from, { text }, { quoted: msg }),
-            react: (emoji) => sock.sendMessage(from, { react: { text: emoji, key: msg.key } })
-          });
-        }
-        return;
-      } else if (buttonId === 'btn_ping') {
-        // Execute ping command
-        const pingCmd = commands.get('ping');
-        if (pingCmd) {
-          await pingCmd.execute(sock, msg, [], {
-            from,
-            sender,
-            isGroup,
-            groupMetadata,
-            isOwner: isOwner(sender),
-            isAdmin: await isAdmin(sock, sender, from, groupMetadata),
-            isBotAdmin: await isBotAdmin(sock, from, groupMetadata),
-            isMod: isMod(sender),
-            reply: (text) => sock.sendMessage(from, { text }, { quoted: msg }),
-            react: (emoji) => sock.sendMessage(from, { react: { text: emoji, key: msg.key } })
-          });
-        }
-        return;
-      } else if (buttonId === 'btn_help') {
-        // Execute list command again (help)
-        const listCmd = commands.get('list');
-        if (listCmd) {
-          await listCmd.execute(sock, msg, [], {
-            from,
-            sender,
-            isGroup,
-            groupMetadata,
-            isOwner: isOwner(sender),
-            isAdmin: await isAdmin(sock, sender, from, groupMetadata),
-            isBotAdmin: await isBotAdmin(sock, from, groupMetadata),
-            isMod: isMod(sender),
-            reply: (text) => sock.sendMessage(from, { text }, { quoted: msg }),
-            react: (emoji) => sock.sendMessage(from, { react: { text: emoji, key: msg.key } })
-          });
+    // Check for numeric replies (Submenu Navigation)
+    const { _menuReply } = require('./commands/general/menu');
+    if (_menuReply) {
+      const resolvedCmd = _menuReply.resolveNumberReply(from, sender, body);
+      if (resolvedCmd) {
+        body = resolvedCmd;
+      }
+    }
+
+    // Command Parser
+    const prefixList = [config.prefix, '/', '#', '!', '.'];
+    const usedPrefix = prefixList.find(p => body.startsWith(p));
+    
+    if (usedPrefix) {
+      const args = body.slice(usedPrefix.length).trim().split(/ +/);
+      const commandName = args.shift().toLowerCase();
+      const command = commands.get(commandName);
+
+      if (command) {
+        // Execute command
+        try {
+          // Check for handler (some use handler, some use execute)
+          const executeFn = command.handler || command.execute;
+          if (executeFn) {
+            await executeFn(sock, msg, args, {
+              from,
+              sender,
+              isGroup,
+              groupMetadata,
+              isOwner: isOwner(sender),
+              isAdmin: await isAdmin(sock, sender, from, groupMetadata),
+              isBotAdmin: await isBotAdmin(sock, from, groupMetadata),
+              isMod: isMod(sender),
+              commandName,
+              reply: (text) => sock.sendMessage(from, { text }, { quoted: msg }),
+              react: (emoji) => sock.sendMessage(from, { react: { text: emoji, key: msg.key } })
+            });
+          }
+        } catch (error) {
+          console.error(`Error executing command ${commandName}:`, error);
         }
         return;
       }

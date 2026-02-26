@@ -1,6 +1,9 @@
 // plugins/broadcast_list.js
 
-const isOwnerOrSudo = require('../lib/isOwner');
+const isOwnerOrSudo = async (number) => {
+  const config = require('../../config');
+  return config.ownerNumber.some(owner => owner.includes(number));
+};
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 
 const NUMBERS = [

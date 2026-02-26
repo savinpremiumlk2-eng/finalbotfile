@@ -18,7 +18,7 @@ function formatViews(n) {
 module.exports = {
   command: 'yt',
   aliases: ['yts', 'ytsearch'],
-  category: 'search',
+  category: 'media',
   description: 'Search YouTube videos and pick one.',
   usage: '.yt <keyword>',
 

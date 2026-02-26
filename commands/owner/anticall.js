@@ -22,7 +22,10 @@
 
 const fs = require('fs');
 const path = require('path');
-const store = require('../lib/lightweight_store');
+const store = {
+  getSetting: async () => null,
+  saveSetting: async () => true
+};
 
 const MONGO_URL = process.env.MONGO_URL;
 const POSTGRES_URL = process.env.POSTGRES_URL;
