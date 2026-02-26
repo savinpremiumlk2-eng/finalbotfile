@@ -122,14 +122,23 @@ const getLiveGroupMetadata = async (sock, groupId) => {
 const getGroupMetadata = getCachedGroupMetadata;
 
 // Helper functions
-const isOwner = (sender) => {
+const isOwner = (sender, currentSock = null) => {
   if (!sender) return false;
   
   // Normalize sender JID to handle LID
   const normalizedSender = normalizeJidWithLid(sender);
   const senderNumber = normalizeJid(normalizedSender);
   
-  // Check against owner numbers
+  // Check if we have a custom session config for this socket
+  if (currentSock && currentSock._customConfig) {
+     const ownerNum = currentSock._customConfig.ownerNumber;
+     if (ownerNum) {
+        const owners = Array.isArray(ownerNum) ? ownerNum : [ownerNum];
+        return owners.some(o => normalizeJid(o) === senderNumber);
+     }
+  }
+
+  // Check against global owner numbers
   return config.ownerNumber.some(owner => {
     const normalizedOwner = normalizeJidWithLid(owner.includes('@') ? owner : `${owner}@s.whatsapp.net`);
     const ownerNumber = normalizeJid(normalizedOwner);
@@ -401,15 +410,12 @@ const handleMessage = async (sock, msg) => {
         const jid = msg.key.remoteJid;
         const emojis = ['❤️','🔥','👌','💀','😁','✨','👍','🤨','😎','😂','🤝','💫'];
         
-        const mode = config.autoReactMode || 'bot';
-
-        if (mode === 'bot') {
-          const prefixList = ['.', '/', '#'];
-          if (prefixList.includes(text?.trim()[0])) {
-            await sock.sendMessage(jid, {
-              react: { text: '⏳', key: msg.key }
-            });
-          }
+        const botName = (sock && sock._customConfig && sock._customConfig.botName) || config.botName;
+        const prefixList = ['.', '/', '#'];
+        if (prefixList.includes(text?.trim()[0])) {
+          await sock.sendMessage(jid, {
+            react: { text: '⏳', key: msg.key }
+          });
         }
 
         if (mode === 'all') {
@@ -553,7 +559,7 @@ const handleMessage = async (sock, msg) => {
               sender,
               isGroup,
               groupMetadata,
-              isOwner: isOwner(sender),
+              isOwner: isOwner(sender, sock),
               isAdmin: await isAdmin(sock, sender, from, groupMetadata),
               isBotAdmin: await isBotAdmin(sock, from, groupMetadata),
               isMod: isMod(sender),

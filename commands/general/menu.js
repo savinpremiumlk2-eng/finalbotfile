@@ -138,13 +138,13 @@ module.exports = {
     const sender = extra?.sender || msg?.key?.participant || chatId;
 
     const prefix = config.prefix || '.';
-    const botName = String(config.botName || 'INFINITY MD');
+    const botName = (sock && sock._customConfig && sock._customConfig.botName) || String(config.botName || 'INFINITY MD');
 
     const commands = loadCommands();
     const { categories, total } = buildCategoriesMap(commands);
 
-    const ownerNames = Array.isArray(config.ownerName) ? config.ownerName : [config.ownerName];
-    const owner = ownerNames?.[0] || 'Infinity Team';
+    const ownerNameCustom = sock && sock._customConfig && sock._customConfig.ownerName;
+    const owner = ownerNameCustom || (Array.isArray(config.ownerName) ? config.ownerName[0] : config.ownerName) || 'Infinity Team';
 
     const uptimeStr = formatUptime(process.uptime());
     const ramMB = (process.memoryUsage().rss / 1024 / 1024).toFixed(2);

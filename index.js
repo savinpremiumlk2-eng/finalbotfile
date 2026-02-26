@@ -50,11 +50,61 @@ app.get('/api/sessions', (req, res) => {
     const sessionList = Object.keys(sessions).map(id => ({
       id,
       name: sessions[id].name,
+      ownerName: sessions[id].ownerName || config.ownerName[0],
+      ownerNumber: sessions[id].ownerNumber || config.ownerNumber[0],
       status: activeSessions.has(id) ? 'Online' : 'Offline'
     }));
     res.json(sessionList);
   } catch (e) {
     res.json([]);
+  }
+});
+
+app.post('/api/session/update', express.json(), async (req, res) => {
+  const { sessionId, botName, ownerName, ownerNumber } = req.body;
+  if (!sessionId) return res.status(400).send('Missing session ID');
+  
+  try {
+    const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
+    if (!sessions[sessionId]) return res.status(404).send('Session not found');
+
+    sessions[sessionId].name = botName || sessions[sessionId].name;
+    sessions[sessionId].ownerName = ownerName || sessions[sessionId].ownerName;
+    sessions[sessionId].ownerNumber = ownerNumber || sessions[sessionId].ownerNumber;
+
+    fs.writeFileSync(sessionsDbPath, JSON.stringify(sessions, null, 2));
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
+app.post('/api/session/delete', express.json(), async (req, res) => {
+  const { sessionId } = req.body;
+  if (!sessionId) return res.status(400).send('Missing session ID');
+
+  try {
+    const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
+    const sessionData = sessions[sessionId];
+    
+    if (activeSessions.has(sessionId)) {
+      const sock = activeSessions.get(sessionId);
+      sock.end();
+      activeSessions.delete(sessionId);
+    }
+
+    if (sessionData) {
+      const sessionFolder = path.join(__dirname, 'session', sessionData.folder);
+      if (fs.existsSync(sessionFolder)) {
+        fs.rmSync(sessionFolder, { recursive: true, force: true });
+      }
+      delete sessions[sessionId];
+      fs.writeFileSync(sessionsDbPath, JSON.stringify(sessions, null, 2));
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).send(error.message);
   }
 });
 
@@ -92,6 +142,13 @@ app.post('/api/session/add', express.json(), async (req, res) => {
       syncFullHistory: false,
       markOnlineOnConnect: true,
     });
+
+    // Attach custom config for handler
+    newSock._customConfig = {
+       botName: botName || 'Infinity MD',
+       ownerName: ownerName || config.ownerName[0],
+       ownerNumber: ownerNumber || config.ownerNumber[0]
+    };
 
     newSock.ev.on('creds.update', saveCreds);
     newSock.ev.on('connection.update', (update) => {
@@ -165,6 +222,13 @@ async function initAllSessions() {
         syncFullHistory: false,
         markOnlineOnConnect: true,
       });
+
+      // Attach custom config for handler
+      newSock._customConfig = {
+         botName: sessionData.name || 'Infinity MD',
+         ownerName: sessionData.ownerName || config.ownerName[0],
+         ownerNumber: sessionData.ownerNumber || config.ownerNumber[0]
+      };
 
       newSock.ev.on('creds.update', saveCreds);
       newSock.ev.on('connection.update', (update) => {

@@ -23,14 +23,17 @@
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
         header { text-align: center; padding: 50px 0; border-bottom: 2px solid var(--neon-blue); margin-bottom: 40px; }
         h1 { font-family: 'Orbitron', sans-serif; font-size: 3rem; color: var(--neon-blue); text-shadow: 0 0 10px var(--neon-blue); margin:0;}
-        .session-card { background: var(--card-bg); border: 1px solid var(--neon-blue); padding: 20px; margin-bottom: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,243,255,0.1); }
-        .btn { background: var(--neon-blue); color: black; border: none; padding: 10px 20px; cursor: pointer; font-family: 'Orbitron'; font-weight: bold; border-radius: 3px; transition: 0.3s; }
+        .session-card { background: var(--card-bg); border: 1px solid var(--neon-blue); padding: 20px; margin-bottom: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,243,255,0.1); position: relative;}
+        .btn { background: var(--neon-blue); color: black; border: none; padding: 8px 15px; cursor: pointer; font-family: 'Orbitron'; font-weight: bold; border-radius: 3px; transition: 0.3s; font-size: 0.8rem;}
         .btn:hover { background: var(--neon-pink); box-shadow: 0 0 15px var(--neon-pink); color: white; }
-        input { background: #111; border: 1px solid var(--neon-blue); color: white; padding: 10px; width: 300px; margin: 5px; border-radius: 3px; }
-        .status-badge { padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; margin-left: 10px; }
+        .btn-danger { background: #ff0000; color: white; }
+        .btn-danger:hover { background: #aa0000; box-shadow: 0 0 15px #ff0000; }
+        input { background: #111; border: 1px solid var(--neon-blue); color: white; padding: 10px; width: 250px; margin: 5px; border-radius: 3px; font-family: 'Rajdhani';}
+        .status-badge { padding: 3px 8px; border-radius: 10px; font-size: 0.7rem; font-weight: bold; margin-left: 10px; }
         .online { background: #00ff00; color: black; }
         .offline { background: #ff0000; color: white; }
-        .sessions-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
+        .sessions-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; }
+        .edit-panel { margin-top: 15px; padding-top: 15px; border-top: 1px dashed rgba(0,243,255,0.3); display: none; }
     </style>
 </head>
 <body>
@@ -43,16 +46,16 @@
         <div class="session-card">
             <h3>Add New Bot</h3>
             <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
-                <input type="text" id="botName" placeholder="Custom Bot Name (e.g. My Helper)">
+                <input type="text" id="botName" placeholder="Bot Name">
+                <input type="text" id="ownerName" placeholder="Owner Name">
+                <input type="text" id="ownerNumber" placeholder="Owner Number (94...)">
                 <input type="text" id="sessionId" placeholder="Session ID (KnightBot!...)">
                 <button class="btn" onclick="addSession()">DEPLOY BOT</button>
             </div>
         </div>
 
-        <h2 style="font-family: 'Orbitron'; color: var(--neon-pink);">Active Bot Sessions</h2>
-        <div id="sessionsList" class="sessions-grid">
-            <!-- Sessions load here -->
-        </div>
+        <h2 style="font-family: 'Orbitron'; color: var(--neon-pink); margin-top: 40px;">Active Bot Sessions</h2>
+        <div id="sessionsList" class="sessions-grid"></div>
     </div>
 
     <script>
@@ -65,62 +68,79 @@
                     data.forEach(s => {
                         const card = document.createElement('div');
                         card.className = 'session-card';
+                        card.id = `card-${s.id}`;
                         card.innerHTML = `
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <div>
                                     <strong style="font-size: 1.2rem; color: var(--neon-blue);">${s.name}</strong>
                                     <span class="status-badge ${s.status.toLowerCase()}">${s.status}</span>
                                 </div>
-                                <button class="btn" onclick="reconnect('${s.id}')">RESTART</button>
+                                <div style="display: flex; gap: 5px;">
+                                    <button class="btn" onclick="toggleEdit('${s.id}')">EDIT</button>
+                                    <button class="btn btn-danger" onclick="deleteSession('${s.id}')">DELETE</button>
+                                </div>
                             </div>
-                            <p style="font-size: 0.8rem; color: #888; margin-top: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">ID: ${s.id}</p>
+                            <div style="margin-top: 10px; font-size: 0.9rem; color: #ccc;">
+                                <div>👑 Owner: ${s.ownerName} (${s.ownerNumber})</div>
+                            </div>
+
+                            <div id="edit-${s.id}" class="edit-panel">
+                                <input type="text" id="edit-name-${s.id}" value="${s.name}" placeholder="Bot Name">
+                                <input type="text" id="edit-owner-${s.id}" value="${s.ownerName}" placeholder="Owner Name">
+                                <input type="text" id="edit-num-${s.id}" value="${s.ownerNumber}" placeholder="Owner Number">
+                                <button class="btn" onclick="updateSession('${s.id}')">SAVE CHANGES</button>
+                            </div>
                         `;
                         list.appendChild(card);
                     });
                 });
         }
 
+        function toggleEdit(id) {
+            const el = document.getElementById(`edit-${id}`);
+            el.style.display = el.style.display === 'block' ? 'none' : 'block';
+        }
+
         function addSession() {
             const id = document.getElementById('sessionId').value;
             const name = document.getElementById('botName').value;
+            const oName = document.getElementById('ownerName').value;
+            const oNum = document.getElementById('ownerNumber').value;
             if(!id) return alert('Session ID is required');
             
-            // Show loading state
-            const btn = document.querySelector('.btn');
-            const originalText = btn.innerText;
-            btn.innerText = 'DEPLOYING...';
-            btn.disabled = true;
-
             fetch('/api/session/add', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ sessionId: id, botName: name })
-            }).then(res => {
-                if(res.ok) {
-                    alert('Bot deployment initiated!');
-                    location.reload();
-                } else {
-                    alert('Failed to add session. Check if ID is valid.');
-                    btn.innerText = originalText;
-                    btn.disabled = false;
-                }
-            }).catch(err => {
-                alert('Network error: ' + err.message);
-                btn.innerText = originalText;
-                btn.disabled = false;
+                body: JSON.stringify({ sessionId: id, botName: name, ownerName: oName, ownerNumber: oNum })
+            }).then(() => location.reload());
+        }
+
+        function updateSession(id) {
+            const name = document.getElementById(`edit-name-${id}`).value;
+            const oName = document.getElementById(`edit-owner-${id}`).value;
+            const oNum = document.getElementById(`edit-num-${id}`).value;
+
+            fetch('/api/session/update', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ sessionId: id, botName: name, ownerName: oName, ownerNumber: oNum })
+            }).then(() => {
+                alert('Settings updated! Restart bot to apply fully.');
+                location.reload();
             });
         }
 
-        function reconnect(id) {
-            fetch('/api/session/add', {
+        function deleteSession(id) {
+            if(!confirm('Are you sure you want to delete this bot and its session files?')) return;
+            fetch('/api/session/delete', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ sessionId: id })
             }).then(() => location.reload());
         }
 
-        setInterval(loadSessions, 10000);
         loadSessions();
+        setInterval(loadSessions, 15000);
     </script>
 </body>
 </html>
