@@ -495,8 +495,39 @@ const handleMessage = async (sock, msg) => {
           body = resolvedCmd;
         }
       }
+
+      // YouTube Numeric Reply
+      const ytModule = require('./commands/media/yt');
+      if (ytModule._ytReply) {
+        const resolvedYt = ytModule._ytReply.resolveNumberReply(from, sender, body);
+        if (resolvedYt) {
+          // If it's a numeric reply for YT, we handle it as a command
+          const args = resolvedYt.split(' ');
+          const cmdName = args.shift().replace(config.prefix, '');
+          const command = commands.get(cmdName);
+          if (command) {
+            const executeFn = command.handler || command.execute;
+            if (executeFn) {
+              await executeFn(sock, msg, args, {
+                from,
+                sender,
+                isGroup,
+                groupMetadata,
+                isOwner: isOwner(sender),
+                isAdmin: await isAdmin(sock, sender, from, groupMetadata),
+                isBotAdmin: await isBotAdmin(sock, from, groupMetadata),
+                isMod: isMod(sender),
+                commandName: cmdName,
+                reply: (text) => sock.sendMessage(from, { text }, { quoted: msg }),
+                react: (emoji) => sock.sendMessage(from, { react: { text: emoji, key: msg.key } })
+              });
+              return;
+            }
+          }
+        }
+      }
     } catch (e) {
-      console.error('Menu reply error:', e.message);
+      console.error('Number reply error:', e.message);
     }
 
     // Command Parser

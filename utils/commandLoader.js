@@ -23,8 +23,11 @@ const loadCommands = () => {
       const files = fs.readdirSync(categoryPath).filter(f => f.endsWith('.js'));
       
       files.forEach(file => {
+        const fullPath = path.join(categoryPath, file);
         try {
-          const command = require(path.join(categoryPath, file));
+          // Clear cache for hot-reloading new plugins
+          delete require.cache[require.resolve(fullPath)];
+          const command = require(fullPath);
           const cmdName = command.name || command.command;
           if (cmdName) {
             commands.set(cmdName, command);

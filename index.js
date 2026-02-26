@@ -12,6 +12,67 @@
 const express = require('express');
 const app = express();
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'views/dashboard.html')));
+
+const activeSessions = new Map();
+
+app.post('/api/session/add', express.json(), async (req, res) => {
+  const { sessionId } = req.body;
+  if (!sessionId) return res.status(400).send('Missing session ID');
+  
+  try {
+    const sessionName = `session_${Date.now()}`;
+    const sessionFolder = path.join(__dirname, 'session', sessionName);
+    
+    if (sessionId.startsWith('KnightBot!')) {
+      const zlib = require('zlib');
+      const b64data = sessionId.split('!')[1];
+      const decoded = zlib.gunzipSync(Buffer.from(b64data, 'base64'));
+      if (!fs.existsSync(sessionFolder)) fs.mkdirSync(sessionFolder, { recursive: true });
+      fs.writeFileSync(path.join(sessionFolder, 'creds.json'), decoded);
+    }
+
+    const { state, saveCreds } = await useMultiFileAuthState(sessionFolder);
+    const { version } = await fetchLatestBaileysVersion();
+
+    const newSock = makeWASocket({
+      version,
+      logger,
+      auth: {
+        creds: state.creds,
+        keys: makeCacheableSignalKeyStore(state.keys, logger),
+      },
+      browser: ['Infinity MD', 'Chrome', '1.0.0'],
+      syncFullHistory: false,
+      markOnlineOnConnect: true,
+    });
+
+    newSock.ev.on('creds.update', saveCreds);
+    newSock.ev.on('connection.update', (update) => {
+      if (update.connection === 'open') {
+        activeSessions.set(sessionId, newSock);
+        console.log(`✅ Session ${sessionId} connected!`);
+      }
+    });
+
+    newSock.ev.on('messages.upsert', async ({ messages, type }) => {
+      if (type !== 'notify') return;
+      for (const msg of messages) {
+        if (!msg?.message) continue;
+        try {
+          await handler.handleMessage(newSock, msg);
+        } catch (err) {
+          console.error('Handler Error:', err);
+        }
+      }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Session Add Error:', error);
+    res.status(500).send(error.message);
+  }
+});
+
 app.get('/api/stats', (req, res) => {
   const uptime = process.uptime();
   const h = Math.floor(uptime / 3600);
