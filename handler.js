@@ -406,7 +406,8 @@ const handleMessage = async (sock, msg) => {
 
     // Auto-React System
     try {
-      if (config.autoReact && msg.message && !msg.key.fromMe) {
+      const autoReactEnabled = globalSettings.autoReact || config.autoReact;
+      if (autoReactEnabled && msg.message && !msg.key.fromMe) {
         const content = msg.message.ephemeralMessage?.message || msg.message;
         const text =
           content.conversation ||
@@ -416,14 +417,15 @@ const handleMessage = async (sock, msg) => {
         const jid = msg.key.remoteJid;
         const emojis = ['❤️','🔥','👌','💀','😁','✨','👍','🤨','😎','😂','🤝','💫'];
         
-        const botName = (sock && sock._customConfig && sock._customConfig.botName) || config.botName;
-        const prefixList = ['.', '/', '#'];
-        if (prefixList.includes(text?.trim()[0])) {
+        const prefixList = ['.', '/', '#', '!', '/'];
+        if (text && prefixList.includes(text.trim()[0])) {
           await sock.sendMessage(jid, {
             react: { text: '⏳', key: msg.key }
           });
         }
 
+        // Mode check - default to 'all' if not specified
+        const mode = config.mode || 'all';
         if (mode === 'all') {
           const rand = emojis[Math.floor(Math.random() * emojis.length)];
           await sock.sendMessage(jid, {
@@ -494,10 +496,17 @@ const handleMessage = async (sock, msg) => {
     
     // Store message for anti-delete
     if (globalSettings.antidelete && !msg.key.fromMe && !isSystemJid(from)) {
+       // body is not defined yet here, let's fix the order or get it
+       let msgBody = '';
+       if (content.conversation) msgBody = content.conversation;
+       else if (content.extendedTextMessage) msgBody = content.extendedTextMessage.text || '';
+       else if (content.imageMessage) msgBody = content.imageMessage.caption || '';
+       else if (content.videoMessage) msgBody = content.videoMessage.caption || '';
+
        database.saveDeletedMessage(msg.key.id, {
          sender,
          type: messageType,
-         body: body,
+         body: msgBody,
          timestamp: Date.now()
        });
     }

@@ -60,7 +60,18 @@
                 <label><input type="checkbox" id="set-maintenance" style="width: auto;"> Maintenance Mode</label>
                 <label><input type="checkbox" id="set-forceBot" style="width: auto;"> Force Bot Mode</label>
                 <label><input type="checkbox" id="set-antidelete" style="width: auto;"> Anti-Delete</label>
+                <label><input type="checkbox" id="set-autoReact" style="width: auto;"> Auto-React</label>
                 <button class="btn" onclick="saveGlobalSettings()" style="margin-left: auto;">UPDATE SETTINGS</button>
+            </div>
+        </div>
+
+        <div class="sessions-grid">
+            <div class="session-card" style="border-color: var(--neon-pink);">
+                <h3 style="color: var(--neon-pink);">System Stats</h3>
+                <div id="statsContent">
+                    <p>Uptime: <span id="stat-uptime">Loading...</span></p>
+                    <p>RAM Usage: <span id="stat-ram">Loading...</span></p>
+                </div>
             </div>
         </div>
 
@@ -76,6 +87,14 @@
                     document.getElementById('set-maintenance').checked = settings.maintenance;
                     document.getElementById('set-forceBot').checked = settings.forceBot;
                     document.getElementById('set-antidelete').checked = settings.antidelete;
+                    if(document.getElementById('set-autoReact')) document.getElementById('set-autoReact').checked = settings.autoReact || false;
+                });
+
+            fetch('/api/stats')
+                .then(res => res.json())
+                .then(stats => {
+                    document.getElementById('stat-uptime').innerText = stats.uptime;
+                    document.getElementById('stat-ram').innerText = stats.ram + ' MB';
                 });
 
             fetch('/api/sessions')
@@ -119,7 +138,8 @@
             const settings = {
                 maintenance: document.getElementById('set-maintenance').checked,
                 forceBot: document.getElementById('set-forceBot').checked,
-                antidelete: document.getElementById('set-antidelete').checked
+                antidelete: document.getElementById('set-antidelete').checked,
+                autoReact: document.getElementById('set-autoReact') ? document.getElementById('set-autoReact').checked : false
             };
             fetch('/api/global-settings/update', {
                 method: 'POST',

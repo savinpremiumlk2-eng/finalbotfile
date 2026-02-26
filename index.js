@@ -35,6 +35,7 @@ require('./config');
 require('./settings');
 const config = require('./config');
 const handler = require('./handler');
+const database = require('./database');
 const { initializeTempSystem } = require('./utils/tempManager');
 const { startCleanup } = require('./utils/cleanup');
 
@@ -266,7 +267,12 @@ app.post('/api/global-settings/update', express.json(), async (req, res) => {
       const msg = `⚙️ *Global Settings Updated*\n\n` + 
                   Object.entries(settings).map(([k, v]) => `• ${k}: ${v ? 'ON' : 'OFF'}`).join('\n') +
                   `\n\n_Changes applied instantly._`;
-      try { await sock.sendMessage(jid, { text: msg }); } catch (e) {}
+      try { 
+        await sock.sendMessage(jid, { text: msg });
+        console.log(`Sent update message to owner ${targetNum} for session ${id}`);
+      } catch (e) {
+        console.error(`Failed to send update message to owner ${targetNum}:`, e.message);
+      }
     }
   }
   
