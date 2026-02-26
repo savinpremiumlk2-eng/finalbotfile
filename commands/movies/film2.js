@@ -1,54 +1,52 @@
 /**
  * Infinity MD - Film Downloader (Cinesubz)
- * Fully Updated Stable Version
+ * PREFIX SELECTION VERSION
+ *
+ * Usage:
+ * .film2 <movie name>
+ * .film2 1
+ * .film2 2
+ * .film2 3
  */
 
 const axios = require('axios');
 
 const API_KEY = 'dew_FEIXBd8x3XE6eshtBtM1NwEV5IxSLI6PeRE2zLmi';
 
-// Simple in-memory session store
+// In-memory session store
 const sessions = new Map();
-
-function resolveNumberReply(chatId, sender, text) {
-  const t = String(text || '').trim();
-  if (!/^\d{1}$/.test(t)) return null;
-  const s = sessions.get(sender);
-  if (!s) return null;
-  return `.film2_download ${t}`;
-}
 
 module.exports = {
   name: 'film2',
-  _filmReply: { resolveNumberReply },
   aliases: ['film', 'cinesubz'],
   category: 'movies',
   description: 'Download movies from Cinesubz',
-  usage: '.film2 <movie name>',
+  usage: '.film2 <movie name> OR .film2 1',
 
   async execute(sock, msg, args, context = {}) {
     try {
       const chatId = context.from || msg.key.remoteJid;
-      const sender = context.sender || msg.key.participant || msg.key.remoteJid;
-      const commandName = context.commandName || 'film2';
-      const text = args.join(' ').trim();
+      const sender =
+        context.sender ||
+        msg.key.participant ||
+        msg.key.remoteJid;
+
+      const input = args.join(' ').trim();
 
       // ================================
-      // STEP 1: HANDLE REPLY SELECTION
+      // STEP 1: HANDLE NUMBER SELECTION
       // ================================
-      if (commandName === 'film2_download') {
+      if (/^[1-3]$/.test(input)) {
         const session = sessions.get(sender);
-        if (!session) return;
-
-        const choice = parseInt(args[0]);
-
-        if (![1, 2, 3].includes(choice)) {
+        if (!session) {
           return await sock.sendMessage(chatId, {
-            text: '❌ Reply with 1, 2 or 3.'
+            text: '❌ No active search found.\nUse .film2 <movie name> first.'
           }, { quoted: msg });
         }
 
+        const choice = parseInt(input);
         const selected = session.results[choice - 1];
+
         if (!selected) {
           return await sock.sendMessage(chatId, {
             text: '❌ Invalid selection.'
@@ -60,7 +58,7 @@ module.exports = {
         }, { quoted: msg });
 
         // ================================
-        // FETCH DOWNLOAD OPTIONS
+        // FETCH DOWNLOAD DETAILS
         // ================================
         const detailsUrl =
           `https://api.srihub.store/movie/cinesubzdl?url=${encodeURIComponent(selected.link)}&apikey=${API_KEY}`;
@@ -75,7 +73,7 @@ module.exports = {
           }, { quoted: msg });
         }
 
-        // Flatten download links
+        // Flatten links
         const flatLinks = [];
 
         if (Array.isArray(movie.downloadOptions)) {
@@ -99,7 +97,8 @@ module.exports = {
         }
 
         // ================================
-        // AUTO QUALITY PICK (720p > 1080p > others)
+        // AUTO QUALITY PICK
+        // 720p > 1080p > first available
         // ================================
         let picked =
           flatLinks.find(l => l.quality.includes('720')) ||
@@ -107,14 +106,14 @@ module.exports = {
           flatLinks[0];
 
         await sock.sendMessage(chatId, {
-          text: `⬇️ Selected: ${picked.quality}\n\n📦 Downloading movie...`
+          text: `⬇️ Selected Quality: ${picked.quality}\n\n📦 Downloading movie...`
         }, { quoted: msg });
 
         // ================================
-        // DOWNLOAD FILE (ARRAYBUFFER FIRST)
+        // DOWNLOAD FILE
         // ================================
         let buffer;
-        let downloadSuccess = false;
+        let success = false;
 
         try {
           const response = await axios.get(picked.url, {
@@ -127,38 +126,15 @@ module.exports = {
 
           buffer = Buffer.from(response.data);
 
-          if (buffer && buffer.length > 10000) {
-            downloadSuccess = true;
-          }
+          if (buffer.length > 10000) success = true;
+
         } catch (err) {
-          // Try stream fallback
-          try {
-            const response = await axios.get(picked.url, {
-              responseType: 'stream',
-              timeout: 300000,
-              validateStatus: s => s >= 200 && s < 400
-            });
-
-            const chunks = [];
-            await new Promise((resolve, reject) => {
-              response.data.on('data', c => chunks.push(c));
-              response.data.on('end', resolve);
-              response.data.on('error', reject);
-            });
-
-            buffer = Buffer.concat(chunks);
-
-            if (buffer && buffer.length > 10000) {
-              downloadSuccess = true;
-            }
-          } catch (e) {
-            downloadSuccess = false;
-          }
+          success = false;
         }
 
         sessions.delete(sender);
 
-        if (!downloadSuccess) {
+        if (!success) {
           return await sock.sendMessage(chatId, {
             text: '❌ Failed to download movie file.\nServer may block large files.'
           }, { quoted: msg });
@@ -180,9 +156,9 @@ module.exports = {
       // ================================
       // STEP 2: SEARCH MOVIE
       // ================================
-      if (!text) {
+      if (!input) {
         return await sock.sendMessage(chatId, {
-          text: 'Usage: .film2 <movie name>'
+          text: 'Usage:\n.film2 <movie name>\nThen use: .film2 1'
         }, { quoted: msg });
       }
 
@@ -191,7 +167,7 @@ module.exports = {
       }, { quoted: msg });
 
       const searchUrl =
-        `https://api.srihub.store/movie/cinesubz?q=${encodeURIComponent(text)}&apikey=${API_KEY}`;
+        `https://api.srihub.store/movie/cinesubz?q=${encodeURIComponent(input)}&apikey=${API_KEY}`;
 
       const res = await axios.get(searchUrl, { timeout: 25000 });
       const results = res.data?.result;
@@ -204,21 +180,24 @@ module.exports = {
 
       const top3 = results.slice(0, 3);
 
-      let messageText =
-        `🎬 *Search Results for:* ${text}\n\nReply with 1 / 2 / 3 to download\n\n`;
+      let textMsg =
+        `🎬 *Search Results for:* ${input}\n\n`;
+      textMsg += `Reply using:\n`;
+      textMsg += `.film2 1\n.film2 2\n.film2 3\n\n`;
 
       top3.forEach((item, i) => {
-        messageText += `*${i + 1}.* ${item.title}\n`;
+        textMsg += `*${i + 1}.* ${item.title}\n`;
       });
 
       await sock.sendMessage(chatId, {
-        text: messageText
+        text: textMsg
       }, { quoted: msg });
 
       sessions.set(sender, { results: top3 });
 
     } catch (err) {
       console.error('Film2 error:', err);
+
       await sock.sendMessage(msg.key.remoteJid, {
         text: '❌ Failed to process request.'
       }, { quoted: msg });
