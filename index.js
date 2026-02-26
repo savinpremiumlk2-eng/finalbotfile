@@ -67,14 +67,26 @@ app.post('/api/session/update', express.json(), async (req, res) => {
   
   try {
     const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
-    if (!sessions[sessionId]) return res.status(404).send('Session not found');
+    if (sessions[sessionId]) {
+      sessions[sessionId].name = botName || sessions[sessionId].name;
+      sessions[sessionId].ownerName = ownerName || sessions[sessionId].ownerName;
+      sessions[sessionId].ownerNumber = ownerNumber || sessions[sessionId].ownerNumber;
 
-    sessions[sessionId].name = botName || sessions[sessionId].name;
-    sessions[sessionId].ownerName = ownerName || sessions[sessionId].ownerName;
-    sessions[sessionId].ownerNumber = ownerNumber || sessions[sessionId].ownerNumber;
+      // Update active socket config if session is online
+      if (activeSessions.has(sessionId)) {
+        const sock = activeSessions.get(sessionId);
+        sock._customConfig = {
+          botName: sessions[sessionId].name,
+          ownerName: sessions[sessionId].ownerName,
+          ownerNumber: sessions[sessionId].ownerNumber
+        };
+      }
 
-    fs.writeFileSync(sessionsDbPath, JSON.stringify(sessions, null, 2));
-    res.json({ success: true });
+      fs.writeFileSync(sessionsDbPath, JSON.stringify(sessions, null, 2));
+      res.json({ success: true });
+    } else {
+      res.status(404).send('Session not found');
+    }
   } catch (error) {
     res.status(500).send(error.message);
   }

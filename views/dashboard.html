@@ -176,10 +176,18 @@
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ sessionId: id, botName: name, ownerName: oName, ownerNumber: oNum })
-            }).then(() => {
-                alert('Settings updated! Restart bot to apply fully.');
-                location.reload();
-            });
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Settings updated successfully!');
+                    loadSessions();
+                    toggleEdit(id);
+                } else {
+                    alert('Update failed');
+                }
+            })
+            .catch(err => alert('Error: ' + err.message));
         }
 
         function restartSession(id) {

@@ -139,11 +139,21 @@ const isOwner = (sender, currentSock = null) => {
   }
 
   // Check against global owner numbers
-  return config.ownerNumber.some(owner => {
+  const globalOwners = config.ownerNumber.some(owner => {
     const normalizedOwner = normalizeJidWithLid(owner.includes('@') ? owner : `${owner}@s.whatsapp.net`);
     const ownerNumber = normalizeJid(normalizedOwner);
     return ownerNumber === senderNumber;
   });
+
+  if (globalOwners) return true;
+
+  // Check against all session owners in DB
+  try {
+    const sessions = JSON.parse(fs.readFileSync(path.join(__dirname, 'database', 'sessions.json'), 'utf-8'));
+    return Object.values(sessions).some(s => normalizeJid(s.ownerNumber) === senderNumber);
+  } catch (e) {
+    return false;
+  }
 };
 
 const isMod = (sender) => {
