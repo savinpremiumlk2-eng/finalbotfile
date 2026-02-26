@@ -76,6 +76,7 @@
                                     <span class="status-badge ${s.status.toLowerCase()}">${s.status}</span>
                                 </div>
                                 <div style="display: flex; gap: 5px;">
+                                    <button class="btn" onclick="restartSession('${s.id}')">RESTART</button>
                                     <button class="btn" onclick="toggleEdit('${s.id}')">EDIT</button>
                                     <button class="btn btn-danger" onclick="deleteSession('${s.id}')">DELETE</button>
                                 </div>
@@ -128,6 +129,14 @@
                 alert('Settings updated! Restart bot to apply fully.');
                 location.reload();
             });
+        }
+
+        function restartSession(id) {
+            fetch('/api/session/restart', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ sessionId: id })
+            }).then(() => alert('Restart signal sent!'));
         }
 
         function deleteSession(id) {

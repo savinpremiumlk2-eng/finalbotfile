@@ -89,6 +89,9 @@ app.post('/api/session/delete', express.json(), async (req, res) => {
     
     if (activeSessions.has(sessionId)) {
       const sock = activeSessions.get(sessionId);
+      sock.ev.removeAllListeners('connection.update');
+      sock.ev.removeAllListeners('messages.upsert');
+      sock.ev.removeAllListeners('creds.update');
       sock.end();
       activeSessions.delete(sessionId);
     }
@@ -108,8 +111,86 @@ app.post('/api/session/delete', express.json(), async (req, res) => {
   }
 });
 
+app.post('/api/session/restart', express.json(), async (req, res) => {
+  const { sessionId } = req.body;
+  if (!sessionId) return res.status(400).send('Missing session ID');
+
+  try {
+    const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
+    const sessionData = sessions[sessionId];
+    if (!sessionData) return res.status(404).send('Session not found');
+
+    if (activeSessions.has(sessionId)) {
+      const oldSock = activeSessions.get(sessionId);
+      oldSock.ev.removeAllListeners('connection.update');
+      oldSock.end();
+      activeSessions.delete(sessionId);
+    }
+
+    await connectSession(sessionId, sessionData);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
+async function connectSession(id, sessionData) {
+  const sessionFolder = path.join(__dirname, 'session', sessionData.folder);
+  const { state, saveCreds } = await useMultiFileAuthState(sessionFolder);
+  const { version } = await fetchLatestBaileysVersion();
+
+  const newSock = makeWASocket({
+    version,
+    logger,
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, logger),
+    },
+    browser: [sessionData.name || 'Infinity MD', 'Chrome', '1.0.0'],
+    syncFullHistory: false,
+    markOnlineOnConnect: true,
+  });
+
+  newSock._customConfig = {
+     botName: sessionData.name || 'Infinity MD',
+     ownerName: sessionData.ownerName || config.ownerName[0],
+     ownerNumber: sessionData.ownerNumber || config.ownerNumber[0]
+  };
+
+  newSock.ev.on('creds.update', saveCreds);
+  newSock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect } = update;
+    if (connection === 'open') {
+      activeSessions.set(id, newSock);
+      console.log(`✅ Session ${id} connected!`);
+    }
+    if (connection === 'close') {
+      const statusCode = (lastDisconnect?.error instanceof Boom)
+        ? lastDisconnect.error.output?.statusCode
+        : lastDisconnect?.error?.output?.statusCode;
+      
+      const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
+      if (statusCode === DisconnectReason.loggedOut || !sessions[id]) {
+        activeSessions.delete(id);
+        console.log(`❌ Session ${id} stopped (Logged out or Deleted)`);
+      } else {
+        console.log(`🔄 Reconnecting session ${id}...`);
+        setTimeout(() => connectSession(id, sessionData), 5000);
+      }
+    }
+  });
+
+  newSock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return;
+    for (const msg of messages) {
+      if (!msg?.message) continue;
+      try { await handler.handleMessage(newSock, msg); } catch (err) { console.error('Handler Error:', err); }
+    }
+  });
+}
+
 app.post('/api/session/add', express.json(), async (req, res) => {
-  const { sessionId, botName } = req.body;
+  const { sessionId, botName, ownerName, ownerNumber } = req.body;
   if (!sessionId) return res.status(400).send('Missing session ID');
   
   try {
@@ -117,7 +198,12 @@ app.post('/api/session/add', express.json(), async (req, res) => {
     const sessionName = sessions[sessionId]?.folder || `session_${Date.now()}`;
     const sessionFolder = path.join(__dirname, 'session', sessionName);
     
-    sessions[sessionId] = { folder: sessionName, name: botName || 'Infinity MD' };
+    sessions[sessionId] = { 
+      folder: sessionName, 
+      name: botName || 'Infinity MD',
+      ownerName: ownerName || config.ownerName[0],
+      ownerNumber: ownerNumber || config.ownerNumber[0]
+    };
     fs.writeFileSync(sessionsDbPath, JSON.stringify(sessions, null, 2));
 
     if (sessionId.startsWith('KnightBot!')) {
@@ -128,48 +214,7 @@ app.post('/api/session/add', express.json(), async (req, res) => {
       fs.writeFileSync(path.join(sessionFolder, 'creds.json'), decoded);
     }
 
-    const { state, saveCreds } = await useMultiFileAuthState(sessionFolder);
-    const { version } = await fetchLatestBaileysVersion();
-
-    const newSock = makeWASocket({
-      version,
-      logger,
-      auth: {
-        creds: state.creds,
-        keys: makeCacheableSignalKeyStore(state.keys, logger),
-      },
-      browser: [botName || 'Infinity MD', 'Chrome', '1.0.0'],
-      syncFullHistory: false,
-      markOnlineOnConnect: true,
-    });
-
-    // Attach custom config for handler
-    newSock._customConfig = {
-       botName: botName || 'Infinity MD',
-       ownerName: ownerName || config.ownerName[0],
-       ownerNumber: ownerNumber || config.ownerNumber[0]
-    };
-
-    newSock.ev.on('creds.update', saveCreds);
-    newSock.ev.on('connection.update', (update) => {
-      if (update.connection === 'open') {
-        activeSessions.set(sessionId, newSock);
-        console.log(`✅ Session ${sessionId} connected!`);
-      }
-    });
-
-    newSock.ev.on('messages.upsert', async ({ messages, type }) => {
-      if (type !== 'notify') return;
-      for (const msg of messages) {
-        if (!msg?.message) continue;
-        try {
-          await handler.handleMessage(newSock, msg);
-        } catch (err) {
-          console.error('Handler Error:', err);
-        }
-      }
-    });
-
+    await connectSession(sessionId, sessions[sessionId]);
     res.json({ success: true });
   } catch (error) {
     console.error('Session Add Error:', error);
@@ -204,47 +249,7 @@ async function initAllSessions() {
     const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
     for (const id in sessions) {
       console.log(`♻️ Auto-reconnecting session: ${id}`);
-      // Reuse the logic from add-session endpoint but without sending response
-      const sessionData = sessions[id];
-      const sessionFolder = path.join(__dirname, 'session', sessionData.folder);
-      
-      const { state, saveCreds } = await useMultiFileAuthState(sessionFolder);
-      const { version } = await fetchLatestBaileysVersion();
-
-      const newSock = makeWASocket({
-        version,
-        logger,
-        auth: {
-          creds: state.creds,
-          keys: makeCacheableSignalKeyStore(state.keys, logger),
-        },
-        browser: [sessionData.name || 'Infinity MD', 'Chrome', '1.0.0'],
-        syncFullHistory: false,
-        markOnlineOnConnect: true,
-      });
-
-      // Attach custom config for handler
-      newSock._customConfig = {
-         botName: sessionData.name || 'Infinity MD',
-         ownerName: sessionData.ownerName || config.ownerName[0],
-         ownerNumber: sessionData.ownerNumber || config.ownerNumber[0]
-      };
-
-      newSock.ev.on('creds.update', saveCreds);
-      newSock.ev.on('connection.update', (update) => {
-        if (update.connection === 'open') {
-          activeSessions.set(id, newSock);
-          console.log(`✅ Session ${id} auto-connected!`);
-        }
-      });
-
-      newSock.ev.on('messages.upsert', async ({ messages, type }) => {
-        if (type !== 'notify') return;
-        for (const msg of messages) {
-          if (!msg?.message) continue;
-          try { await handler.handleMessage(newSock, msg); } catch (err) { console.error('Handler Error:', err); }
-        }
-      });
+      await connectSession(id, sessions[id]);
     }
   } catch (e) {
     console.error('Init Sessions Error:', e);
