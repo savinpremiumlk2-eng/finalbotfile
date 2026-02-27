@@ -1,10 +1,10 @@
 // movie.js - Pixeldrain → Telegram → WhatsApp (FIXED)
 require('dotenv').config();
-const { cmd } = require("../command");
+const { cmd } = require("../../command");
 const { sendButtons, sendInteractiveMessage } = require("gifted-btns");
-const puppeteer = require("puppeteer");
+const puppeteer = require("puppeteer-core");
 const TelegramBot = require("node-telegram-bot-api");
-const config = require("../config");
+const config = require("../../config");
 const FormData = require('form-data');
 const axios = require('axios');
 
@@ -15,10 +15,27 @@ const channelName = '🍁 ＤＡＮＵＷＡ－ 〽️Ｄ 🍁';
 const imageUrl = "https://github.com/DANUWA-MD/DANUWA-BOT/blob/main/images/film.png?raw=true";
 
 // Telegram Bot Setup
-const tgBot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, { polling: false });
+const tgBot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN || 'dummy', { polling: false });
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 // ---------- Helpers ----------
+async function getBrowser() {
+  return await puppeteer.launch({
+    executablePath: '/usr/bin/google-chrome',
+    headless: true,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-accelerated-2d-canvas",
+      "--no-first-run",
+      "--no-zygote",
+      "--single-process",
+      "--disable-gpu"
+    ]
+  });
+}
+
 function normalizeQuality(text) {
   if (!text) return null;
   text = text.toUpperCase();
@@ -105,9 +122,9 @@ async function uploadToTelegram(fileId) {
 // ---------- Movie Search ----------
 async function searchMovies(query) {
   const url = `https://sinhalasub.lk/?s=${encodeURIComponent(query)}&post_type=movies`;
-  const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox"] });
+  const browser = await getBrowser();
   const page = await browser.newPage();
-  await page.goto(url, { waitUntil: "networkidle2", timeout: 30000 });
+  await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
 
   const results = await page.$$eval(".display-item .item-box", boxes =>
     boxes.slice(0, 10).map((box, index) => {
@@ -134,9 +151,9 @@ async function searchMovies(query) {
 
 // ---------- Movie Metadata ----------
 async function getMovieMetadata(url) {
-  const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox"] });
+  const browser = await getBrowser();
   const page = await browser.newPage();
-  await page.goto(url, { waitUntil: "networkidle2", timeout: 30000 });
+  await page.goto(url, { waitUntil: "networkidle2", timeout: 60000 });
 
   const metadata = await page.evaluate(() => {
     const getText = el => el?.textContent.trim() || "";
@@ -169,9 +186,9 @@ async function getMovieMetadata(url) {
 
 // ---------- Pixeldrain Links ----------
 async function getPixeldrainLinks(movieUrl) {
-  const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox"] });
+  const browser = await getBrowser();
   const page = await browser.newPage();
-  await page.goto(movieUrl, { waitUntil: "networkidle2", timeout: 30000 });
+  await page.goto(movieUrl, { waitUntil: "networkidle2", timeout: 60000 });
 
   const rows = await page.$$eval(".link-pixeldrain tbody tr", trs =>
     trs.map(tr => {
@@ -280,7 +297,7 @@ cmd({
       let emojiIndex = adjustedIndex.toString().split("").map(num => numberEmojis[num]).join("");
       filmListMessage += `${emojiIndex} *${movie.title}*\n\n`;
     });
-    filmListMessage += `*📝 Reply with movie number (1-${searchResults.length})*`;
+    filmListMessage += `*📝 Reply with the movie number (1-${searchResults.length})*`;
 
     await danuwa.sendMessage(from, {
       image: { url: imageUrl },
