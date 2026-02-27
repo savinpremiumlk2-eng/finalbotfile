@@ -27,8 +27,14 @@ const loadCommands = () => {
         try {
           // Clear cache for hot-reloading new plugins
           delete require.cache[require.resolve(fullPath)];
-          const command = require(fullPath);
-          const cmdName = command.name || command.command;
+          const commandModule = require(fullPath);
+          
+          // Support both module.exports = { ... } and cmd({ ... }) styles
+          const { commands: cmdRegistry } = require('../command');
+          
+          let command = commandModule;
+          
+          const cmdName = command.name || command.command || command.pattern;
           if (cmdName) {
             commands.set(cmdName, command);
             if (command.aliases) {
@@ -36,7 +42,21 @@ const loadCommands = () => {
                 commands.set(alias, command);
               });
             }
+            if (command.alias) {
+              const aliases = Array.isArray(command.alias) ? command.alias : [command.alias];
+              aliases.forEach(alias => {
+                commands.set(alias, command);
+              });
+            }
           }
+          
+          // Also load anything registered via cmd() in that file
+          cmdRegistry.forEach((cmdObj, name) => {
+            if (!commands.has(name)) {
+              commands.set(name, cmdObj);
+            }
+          });
+          
         } catch (error) {
           console.error(`Error loading command ${file}:`, error.message);
         }
