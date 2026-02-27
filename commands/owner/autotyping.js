@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const store = require('../lib/lightweight_store');
+const store = require('../../utils/lightweight_store');
 
 const MONGO_URL = process.env.MONGO_URL;
 const POSTGRES_URL = process.env.POSTGRES_URL;
