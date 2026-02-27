@@ -36,20 +36,16 @@ module.exports = {
       const input = args.join(' ').trim();
 
       // =====================================================
-      // STEP 1 — HANDLE SELECTION (.film2 1 / 2 / 3)
+      // STEP 1 — HANDLE SELECTION (Reply with number)
       // =====================================================
-      if (/^[1-3]$/.test(input)) {
+      if (sessions.has(sender) && /^\d+$/.test(input)) {
+        const index = parseInt(input) - 1;
         const session = sessions.get(sender);
-        if (!session) {
-          return sock.sendMessage(chatId, {
-            text: '❌ No active search.\nUse .film2 <movie name> first.'
-          }, { quoted: msg });
-        }
+        const selected = session.results[index];
 
-        const selected = session.results[parseInt(input) - 1];
         if (!selected) {
           return sock.sendMessage(chatId, {
-            text: '❌ Invalid selection.'
+            text: `❌ Invalid selection. Please choose 1-${session.results.length}.`
           }, { quoted: msg });
         }
 
@@ -233,13 +229,13 @@ module.exports = {
         }, { quoted: msg });
       }
 
-      const top3 = results.slice(0, 3);
+      const top10 = results.slice(0, 10);
 
       let messageText =
         `🎬 *Search Results for:* ${input}\n\n` +
-        `Reply using:\n.film2 1\n.film2 2\n.film2 3\n\n`;
+        `Reply with the number to download.\n\n`;
 
-      top3.forEach((item, i) => {
+      top10.forEach((item, i) => {
         messageText += `*${i + 1}.* ${item.title}\n`;
       });
 
@@ -247,7 +243,7 @@ module.exports = {
         text: messageText
       }, { quoted: msg });
 
-      sessions.set(sender, { results: top3 });
+      sessions.set(sender, { results: top10 });
 
     } catch (err) {
       console.error('Film2 error:', err);
