@@ -65,21 +65,22 @@ module.exports = {
       } else {
         // It's a search query
         try {
-          const searchRes = await axios.get(`https://api.siputzx.my.id/api/s/tiktok?query=${encodeURIComponent(q)}`);
-          if (searchRes.data && searchRes.data.status && searchRes.data.data && searchRes.data.data.length > 0) {
-            const results = searchRes.data.data.slice(0, 5);
+          const results = await APIs.tiktokSearch(q);
+          if (results && results.length > 0) {
+            const topResults = results.slice(0, 5);
             let message = `╭───〔 🔍 TIKTOK SEARCH 〕───\n│ 💬 *Results for*: ${q}\n╰────────────────────\n\n`;
             
-            for (let i = 0; i < results.length; i++) {
-              message += `*${i + 1}.* ${results[i].title || 'No Title'}\n`;
-              message += `👤 *Author*: ${results[i].author?.nickname || 'Unknown'}\n`;
-              message += `🔗 *URL*: ${results[i].url}\n\n`;
+            for (let i = 0; i < topResults.length; i++) {
+              const res = topResults[i];
+              message += `*${i + 1}.* ${res.title || 'No Title'}\n`;
+              message += `👤 *Author*: ${res.author?.unique_id || 'Unknown'}\n`;
+              message += `📥 *Download*: .tiktok ${res.play}\n\n`;
             }
             
             message += `> 💫 *INFINITY MD SEARCH*`;
             
             await sock.sendMessage(from, {
-              image: { url: results[0].cover || 'https://i.ibb.co/L8G6pTz/tiktok.jpg' },
+              image: { url: topResults[0].cover || 'https://i.ibb.co/L8G6pTz/tiktok.jpg' },
               caption: message
             }, { quoted: msg });
             await react('✅');

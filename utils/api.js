@@ -424,7 +424,12 @@ const APIs = {
   
   // TikTok Download API
   getTikTokDownload: async (url) => {
-    // Try multiple APIs for TikTok
+    // If it's a search query instead of a link, use the search endpoint
+    if (!url.includes('tiktok.com') && !url.includes('vt.tiktok')) {
+      return APIs.tiktokSearch(url);
+    }
+
+    // Try multiple APIs for TikTok download
     const apiUrls = [
       `https://api.siputzx.my.id/api/d/tiktok?url=${encodeURIComponent(url)}`,
       `https://api.shizokeu.xyz/api/download/tiktok?url=${encodeURIComponent(url)}`,
@@ -456,6 +461,22 @@ const APIs = {
       }
     }
     throw new Error('TikTok download failed on all mirrors');
+  },
+
+  // TikTok Search API
+  tiktokSearch: async (query) => {
+    const apiKey = 'dew_FEIXBd8x3XE6eshtBtM1NwEV5IxSLI6PeRE2zLmi';
+    const apiUrl = `https://api.srihub.store/search/tiktok?q=${encodeURIComponent(query)}&apikey=${apiKey}`;
+    
+    try {
+      const response = await axios.get(apiUrl, { timeout: 15000 });
+      if (response.data && response.data.success && response.data.result) {
+        return response.data.result;
+      }
+      throw new Error('No results found');
+    } catch (error) {
+      throw new Error('TikTok search failed');
+    }
   },
   
   // Screenshot Website API
