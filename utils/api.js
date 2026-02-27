@@ -473,7 +473,7 @@ const APIs = {
         timeout: 25000,
         headers: {
           'accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
       });
       
@@ -481,21 +481,9 @@ const APIs = {
         return response.data.result;
       }
       
-      // Secondary fallback if structure is different
-      if (response.data && Array.isArray(response.data.data)) {
-        return response.data.data;
-      }
-
       throw new Error('Invalid response from search API');
     } catch (error) {
-      console.error('TikTok search error:', error.message);
-      // Try one more fallback if primary fails
-      try {
-        const fallbackRes = await axios.get(`https://api.siputzx.my.id/api/s/tiktok?query=${encodeURIComponent(query)}`);
-        return fallbackRes.data?.data || [];
-      } catch (e) {
-        throw new Error('TikTok search failed on all mirrors');
-      }
+      throw error;
     }
   },
   

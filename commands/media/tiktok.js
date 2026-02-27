@@ -2,10 +2,8 @@
  * TikTok Downloader & Search - Download TikTok videos
  */
 
-const { ttdl } = require('ruhend-scraper');
 const axios = require('axios');
 const APIs = require('../../utils/api');
-const config = require('../../config');
 
 module.exports = {
   name: 'tiktok',
@@ -18,6 +16,7 @@ module.exports = {
     const { from, reply, react } = extra;
     try {
       const q = args.join(" ");
+      const apiKey = 'dew_FEIXBd8x3XE6eshtBtM1NwEV5IxSLI6PeRE2zLmi';
       
       if (!q) {
         return await reply(`╭───〔 📥 TIKTOK DL & SEARCH 〕───\n│ ❌ Please provide a TikTok link or search query.\n╰────────────────────`);
@@ -27,59 +26,48 @@ module.exports = {
       
       // If it's a link, download directly
       if (q.includes('tiktok.com') || q.includes('vt.tiktok') || q.includes('tikwm.com')) {
-        try {
-          let videoUrl = null;
-          let title = null;
-          
-          // Special check if it's already a direct play link from Srihub
-          if (q.includes('tikwm.com/video/media/play')) {
-            videoUrl = q;
-            title = 'TikTok Download';
-          }
-          
-          if (!videoUrl) {
-            const result = await APIs.getTikTokDownload(q).catch(() => null);
-            if (result) {
-              videoUrl = result.videoUrl;
-              title = result.title;
-            }
-          }
-          
-          if (!videoUrl) {
-            const downloadData = await ttdl(q).catch(() => null);
-            if (downloadData && downloadData.data && downloadData.data.length > 0) {
-              videoUrl = downloadData.data[0].url;
-            }
-          }
-          
-          // Fallback to a direct download API if others fail
-          if (!videoUrl) {
-             const fbRes = await axios.get(`https://api.siputzx.my.id/api/d/tiktok?url=${encodeURIComponent(q)}`).catch(() => null);
-             if (fbRes?.data?.data?.url) videoUrl = fbRes.data.data.url;
-          }
-          
-          if (videoUrl) {
-            await sock.sendMessage(from, {
-              video: { url: videoUrl },
-              caption: `╭───〔 📥 TIKTOK DL 〕───\n${title ? `│ 📝 *Title*: ${title}\n` : ''}│ ✅ *Success*\n╰────────────────────\n\n> 💫 *INFINITY MD DOWNLOADER*`
-            }, { quoted: msg });
-            await react('✅');
-          } else {
-            await reply(`╭───〔 📥 TIKTOK DL 〕───\n│ ❌ Failed to download video.\n╰────────────────────`);
-          }
-        } catch (error) {
-          await reply(`╭───〔 📥 TIKTOK DL 〕───\n│ ❌ Error: ${error.message}\n╰────────────────────`);
+        let videoUrl = q;
+        let title = 'TikTok Video';
+
+        // If it's not a direct link yet, try to get one
+        if (!q.includes('tikwm.com/video/media/play')) {
+           try {
+             const res = await axios.get(`https://api.siputzx.my.id/api/d/tiktok?url=${encodeURIComponent(q)}`);
+             if (res.data?.data?.url || res.data?.data?.video_url) {
+               videoUrl = res.data.data.url || res.data.data.video_url;
+               title = res.data.data.metadata?.title || 'TikTok Video';
+             }
+           } catch (e) {
+             // Fallback to existing API utility
+             const result = await APIs.getTikTokDownload(q).catch(() => null);
+             if (result) {
+               videoUrl = result.videoUrl;
+               title = result.title;
+             }
+           }
+        }
+
+        if (videoUrl) {
+          await sock.sendMessage(from, {
+            video: { url: videoUrl },
+            caption: `╭───〔 📥 TIKTOK DL 〕───\n│ 📝 *Title*: ${title}\n│ ✅ *Success*\n╰────────────────────\n\n> 💫 *INFINITY MD DOWNLOADER*`
+          }, { quoted: msg });
+          await react('✅');
+        } else {
+          await reply(`╭───〔 📥 TIKTOK DL 〕───\n│ ❌ Failed to download video.\n╰────────────────────`);
         }
       } else {
-        // It's a search query
+        // It's a search query - Only use the requested Srihub endpoint
         try {
-          const results = await APIs.tiktokSearch(q);
-          if (results && results.length > 0) {
-            const topResults = results.slice(0, 5);
+          const searchUrl = `https://api.srihub.store/search/tiktok?q=${encodeURIComponent(q)}&apikey=${apiKey}`;
+          const response = await axios.get(searchUrl, { timeout: 25000 });
+          
+          if (response.data && response.data.success && response.data.result && response.data.result.length > 0) {
+            const results = response.data.result.slice(0, 5);
             let message = `╭───〔 🔍 TIKTOK SEARCH 〕───\n│ 💬 *Results for*: ${q}\n╰────────────────────\n\n`;
             
-            for (let i = 0; i < topResults.length; i++) {
-              const res = topResults[i];
+            for (let i = 0; i < results.length; i++) {
+              const res = results[i];
               message += `*${i + 1}.* ${res.title || 'No Title'}\n`;
               message += `👤 *Author*: ${res.author?.unique_id || 'Unknown'}\n`;
               message += `📥 *Download*: .tiktok ${res.play}\n\n`;
@@ -88,7 +76,7 @@ module.exports = {
             message += `> 💫 *INFINITY MD SEARCH*`;
             
             await sock.sendMessage(from, {
-              image: { url: topResults[0].cover || 'https://i.ibb.co/L8G6pTz/tiktok.jpg' },
+              image: { url: results[0].cover || 'https://i.ibb.co/L8G6pTz/tiktok.jpg' },
               caption: message
             }, { quoted: msg });
             await react('✅');
@@ -96,7 +84,7 @@ module.exports = {
             await reply(`╭───〔 🔍 TIKTOK SEARCH 〕───\n│ ❌ No results found for "${q}".\n╰────────────────────`);
           }
         } catch (error) {
-          await reply(`╭───〔 🔍 TIKTOK SEARCH 〕───\n│ ❌ Error: ${error.message}\n╰────────────────────`);
+          await reply(`╭───〔 🔍 TIKTOK SEARCH 〕───\n│ ❌ Search Error: ${error.message}\n╰────────────────────`);
         }
       }
     } catch (error) {
