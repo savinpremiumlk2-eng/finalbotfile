@@ -424,40 +424,38 @@ const APIs = {
   
   // TikTok Download API
   getTikTokDownload: async (url) => {
-    const apiUrl = `https://api.siputzx.my.id/api/d/tiktok?url=${encodeURIComponent(url)}`;
-    try {
-      const response = await axios.get(apiUrl, { 
-        timeout: 15000,
-        headers: {
-          'accept': '*/*',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-      });
-      
-      if (response.data && response.data.status && response.data.data) {
-        let videoUrl = null;
-        let title = null;
+    // Try multiple APIs for TikTok
+    const apiUrls = [
+      `https://api.siputzx.my.id/api/d/tiktok?url=${encodeURIComponent(url)}`,
+      `https://api.shizokeu.xyz/api/download/tiktok?url=${encodeURIComponent(url)}`,
+      `https://api.vreden.my.id/api/tiktok?url=${encodeURIComponent(url)}`
+    ];
+    
+    for (const apiUrl of apiUrls) {
+      try {
+        const response = await axios.get(apiUrl, { 
+          timeout: 15000,
+          headers: {
+            'accept': '*/*',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
         
-        if (response.data.data.urls && Array.isArray(response.data.data.urls) && response.data.data.urls.length > 0) {
-          videoUrl = response.data.data.urls[0];
-          title = response.data.data.metadata?.title || 'TikTok Video';
-        } else if (response.data.data.video_url) {
-          videoUrl = response.data.data.video_url;
-          title = response.data.data.metadata?.title || 'TikTok Video';
-        } else if (response.data.data.url) {
-          videoUrl = response.data.data.url;
-          title = response.data.data.metadata?.title || 'TikTok Video';
-        } else if (response.data.data.download_url) {
-          videoUrl = response.data.data.download_url;
-          title = response.data.data.metadata?.title || 'TikTok Video';
+        if (response.data && response.data.status && response.data.data) {
+          let videoUrl = null;
+          let title = null;
+          const d = response.data.data;
+          
+          videoUrl = d.urls?.[0] || d.video_url || d.url || d.download_url || d.nowm || d.no_watermark;
+          title = d.metadata?.title || d.title || 'TikTok Video';
+          
+          if (videoUrl) return { videoUrl, title };
         }
-        
-        return { videoUrl, title };
+      } catch (error) {
+        continue;
       }
-      throw new Error('Invalid API response');
-    } catch (error) {
-      throw new Error('TikTok download failed');
     }
+    throw new Error('TikTok download failed on all mirrors');
   },
   
   // Screenshot Website API

@@ -236,7 +236,7 @@ async function getPixeldrainLinks(movieUrl) {
 /* ================= COMMAND: MOVIE SEARCH ================= */
 cmd({
   pattern: "movie",
-  alias: ["sinhalasub","films","cinema", "film3", "movie3", "subslk3"],
+  alias: ["sinhalasub","films","cinema", "film3", "movie3", "subslk3", "film"],
   react: "🎬",
   desc: "Search SinhalaSub movies",
   category: "download",

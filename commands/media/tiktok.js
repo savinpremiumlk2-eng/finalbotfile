@@ -26,7 +26,7 @@ module.exports = {
       await react('⏳');
       
       // If it's a link, download directly
-      if (q.includes('tiktok.com')) {
+      if (q.includes('tiktok.com') || q.includes('vt.tiktok')) {
         try {
           let videoUrl = null;
           let title = null;
@@ -42,6 +42,12 @@ module.exports = {
             if (downloadData && downloadData.data && downloadData.data.length > 0) {
               videoUrl = downloadData.data[0].url;
             }
+          }
+          
+          // Fallback to a direct download API if others fail
+          if (!videoUrl) {
+             const fbRes = await axios.get(`https://api.siputzx.my.id/api/d/tiktok?url=${encodeURIComponent(q)}`).catch(() => null);
+             if (fbRes?.data?.data?.url) videoUrl = fbRes.data.data.url;
           }
           
           if (videoUrl) {

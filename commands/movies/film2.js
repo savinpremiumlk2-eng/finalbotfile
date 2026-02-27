@@ -220,8 +220,11 @@ module.exports = {
       const searchUrl =
         `https://api.srihub.store/movie/cinesubz?q=${encodeURIComponent(input)}&apikey=${API_KEY}`;
 
-      const res = await axios.get(searchUrl, { timeout: 25000 });
-      const results = res.data?.result;
+      const res = await axios.get(searchUrl, { timeout: 25000 }).catch(e => {
+          // Fallback search if primary fails
+          return axios.get(`https://api.siputzx.my.id/api/s/cinesubz?query=${encodeURIComponent(input)}`);
+      });
+      const results = res.data?.result || res.data?.data;
 
       if (!results || !results.length) {
         return sock.sendMessage(chatId, {
