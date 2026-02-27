@@ -34,27 +34,20 @@ const loadCommands = () => {
           
           let command = commandModule;
           
-          const cmdName = command.name || command.command || command.pattern;
+          const cmdName = command.pattern || command.name || command.command;
           if (cmdName) {
             commands.set(cmdName, command);
-            if (command.aliases) {
-              command.aliases.forEach(alias => {
-                commands.set(alias, command);
-              });
-            }
-            if (command.alias) {
-              const aliases = Array.isArray(command.alias) ? command.alias : [command.alias];
-              aliases.forEach(alias => {
-                commands.set(alias, command);
-              });
+            const aliases = command.aliases || command.alias || [];
+            if (Array.isArray(aliases)) {
+              aliases.forEach(alias => commands.set(alias, command));
+            } else if (typeof aliases === 'string') {
+              commands.set(aliases, command);
             }
           }
           
           // Also load anything registered via cmd() in that file
           cmdRegistry.forEach((cmdObj, name) => {
-            if (!commands.has(name)) {
-              commands.set(name, cmdObj);
-            }
+            commands.set(name, cmdObj);
           });
           
         } catch (error) {

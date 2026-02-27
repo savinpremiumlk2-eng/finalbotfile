@@ -16,7 +16,13 @@ const groupMetadataCache = new Map();
 const CACHE_TTL = 60000; // 1 minute cache
 
 // Load all commands
+const { commands: cmdRegistry } = require('./command');
 const commands = loadCommands();
+
+// Merge registries
+cmdRegistry.forEach((cmdObj, name) => {
+  commands.set(name, cmdObj);
+});
 
 // Unwrap WhatsApp containers (ephemeral, view once, etc.)
 const getMessageContent = (msg) => {
@@ -588,9 +594,12 @@ const handleMessage = async (sock, msg) => {
     if (usedPrefix) {
       const args = body.slice(usedPrefix.length).trim().split(/ +/);
       const commandName = args.shift().toLowerCase();
-      const command = commands.get(commandName);
+      
+      // Try to get command from either registry
+      const command = commands.get(commandName) || cmdRegistry.get(commandName);
 
       if (command) {
+        console.log(`[Command] Executing: ${commandName} for ${sender}`);
         const globalSettings = database.getGlobalSettings();
         if (globalSettings.forceBot && !isOwner(sender, sock)) {
            await sock.sendMessage(from, { text: '⚠️ *Force Bot Mode is ON.*\nOnly owners can use commands right now.' }, { quoted: msg });
