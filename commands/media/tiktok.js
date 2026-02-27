@@ -26,15 +26,23 @@ module.exports = {
       await react('⏳');
       
       // If it's a link, download directly
-      if (q.includes('tiktok.com') || q.includes('vt.tiktok')) {
+      if (q.includes('tiktok.com') || q.includes('vt.tiktok') || q.includes('tikwm.com')) {
         try {
           let videoUrl = null;
           let title = null;
           
-          const result = await APIs.getTikTokDownload(q).catch(() => null);
-          if (result) {
-            videoUrl = result.videoUrl;
-            title = result.title;
+          // Special check if it's already a direct play link from Srihub
+          if (q.includes('tikwm.com/video/media/play')) {
+            videoUrl = q;
+            title = 'TikTok Download';
+          }
+          
+          if (!videoUrl) {
+            const result = await APIs.getTikTokDownload(q).catch(() => null);
+            if (result) {
+              videoUrl = result.videoUrl;
+              title = result.title;
+            }
           }
           
           if (!videoUrl) {

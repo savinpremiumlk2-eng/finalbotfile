@@ -469,13 +469,33 @@ const APIs = {
     const apiUrl = `https://api.srihub.store/search/tiktok?q=${encodeURIComponent(query)}&apikey=${apiKey}`;
     
     try {
-      const response = await axios.get(apiUrl, { timeout: 15000 });
-      if (response.data && response.data.success && response.data.result) {
+      const response = await axios.get(apiUrl, { 
+        timeout: 25000,
+        headers: {
+          'accept': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+      
+      if (response.data && response.data.success && Array.isArray(response.data.result)) {
         return response.data.result;
       }
-      throw new Error('No results found');
+      
+      // Secondary fallback if structure is different
+      if (response.data && Array.isArray(response.data.data)) {
+        return response.data.data;
+      }
+
+      throw new Error('Invalid response from search API');
     } catch (error) {
-      throw new Error('TikTok search failed');
+      console.error('TikTok search error:', error.message);
+      // Try one more fallback if primary fails
+      try {
+        const fallbackRes = await axios.get(`https://api.siputzx.my.id/api/s/tiktok?query=${encodeURIComponent(query)}`);
+        return fallbackRes.data?.data || [];
+      } catch (e) {
+        throw new Error('TikTok search failed on all mirrors');
+      }
     }
   },
   
