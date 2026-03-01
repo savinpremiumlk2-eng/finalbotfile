@@ -1,11 +1,10 @@
 const axios = require('axios');
 const config = require('../../config');
 
-// ✅ API inside plugin (as you requested)
 const API_KEY = 'qasim-dev';
-const API_URL = 'https://api.qasimdev.dpdns.org/api/yts/searchVideos';
+const SEARCH_API = 'https://api.qasimdev.dpdns.org/api/yts/searchVideos';
+const DOWNLOAD_API = 'https://api.qasimdev.dpdns.org/api/youtube/download';
 
-// in-memory sessions
 const SESSIONS = new Map();
 
 function formatViews(n) {
@@ -16,78 +15,98 @@ function formatViews(n) {
   return String(num);
 }
 
-function resolveNumberReply(chatId, sender, text) {
-  const t = String(text || '').trim();
-  if (!/^\d{1,2}$/.test(t)) return null;
-  const sessionKey = `${chatId}|${sender}`;
-  const s = SESSIONS.get(sessionKey);
-  if (!s) return null;
-  return `.yt_download ${t}`;
-}
-
 module.exports = {
   command: 'yt',
-  _ytReply: { resolveNumberReply },
   aliases: ['yts', 'ytsearch'],
   category: 'media',
-  description: 'Search YouTube videos and pick one.',
+  description: 'Search YouTube and send direct video.',
   usage: '.yt <keyword>',
 
   async handler(sock, message, args, context = {}) {
+
     const chatId = context.chatId || message.key.remoteJid;
     const senderId = message.key.participant || message.key.remoteJid;
-    const query = args.join(' ').trim();
-    const commandName = context.commandName || 'yt';
+    const text = (message.message?.conversation ||
+                 message.message?.extendedTextMessage?.text || '').trim();
 
-    const sendText = (text, quoted = message) =>
-      sock.sendMessage(chatId, { text }, { quoted });
-
-    async function clearSession(key) {
-      const s = SESSIONS.get(key);
-      if (s?.timeout) clearTimeout(s.timeout);
-      SESSIONS.delete(key);
-    }
-
-    if (commandName === 'yt_download') {
-      const sessionKey = `${chatId}|${senderId}`;
-      const session = SESSIONS.get(sessionKey);
-      if (!session) return;
-      const choice = parseInt(args[0], 10);
-      const v = session.videos[choice - 1];
-      if (!v) return;
-      
-      await clearSession(sessionKey);
-      const msg = `✅ *Selected Video*\n\n🎬 ${v.title}\n👤 ${v?.author?.name || 'Unknown'}\n⏱ ${v?.duration?.timestamp || 'N/A'}\n👁 ${formatViews(v?.views)} views\n\n${v.url}`;
-      return sendText(msg);
-    }
-
-    if (query.startsWith(config.prefix)) return;
     const sessionKey = `${chatId}|${senderId}`;
 
-    try {
-      if (!query) {
-        return await sendText('❌ Usage: .yt <search>\nExample: .yt mr beast');
+    const sendText = (textMsg) =>
+      sock.sendMessage(chatId, { text: textMsg }, { quoted: message });
+
+    // ==========================================
+    // ✅ NUMBER REPLY DETECTION (NO PREFIX NEEDED)
+    // ==========================================
+    if (/^[1-5]$/.test(text)) {
+      const session = SESSIONS.get(sessionKey);
+      if (!session) return;
+
+      const choice = parseInt(text);
+      const selected = session.videos[choice - 1];
+      if (!selected) return;
+
+      SESSIONS.delete(sessionKey);
+
+      await sendText('⬇️ Downloading video...');
+
+      try {
+        const downloadRes = await axios.get(DOWNLOAD_API, {
+          timeout: 60000,
+          params: {
+            apiKey: API_KEY,
+            url: selected.url,
+            format: 'mp4'
+          }
+        });
+
+        if (!downloadRes.data?.success || !downloadRes.data?.data?.downloadUrl) {
+          return sendText('❌ Download API failed.');
+        }
+
+        const videoUrl = downloadRes.data.data.downloadUrl;
+
+        return await sock.sendMessage(chatId, {
+          video: { url: videoUrl },
+          caption:
+            `🎬 *${selected.title}*\n` +
+            `👤 ${selected?.author?.name || 'Unknown'}\n` +
+            `⏱ ${selected?.duration?.timestamp || 'N/A'}\n\n` +
+            `> INFINITY MD`
+        }, { quoted: message });
+
+      } catch (err) {
+        console.error(err.message);
+        return sendText('❌ Download failed.');
       }
+    }
+
+    // ==========================================
+    // 🔎 NORMAL SEARCH PART
+    // ==========================================
+
+    const query = args.join(' ').trim();
+    if (!query) return;
+
+    try {
 
       await sendText('🔎 Searching YouTube...');
 
-      const res = await axios.get(API_URL, {
+      const res = await axios.get(SEARCH_API, {
         timeout: 25000,
         params: {
           apiKey: API_KEY,
           query,
           limit: 10
-        },
-        validateStatus: () => true
+        }
       });
 
-      if (res.status !== 200 || !res.data?.success) {
-        return await sendText('❌ API search failed.');
+      if (!res.data?.success) {
+        return sendText('❌ API search failed.');
       }
 
       const videos = res.data?.data?.videos;
       if (!Array.isArray(videos) || videos.length === 0) {
-        return await sendText('❌ No results found.');
+        return sendText('❌ No results found.');
       }
 
       const top = videos.slice(0, 5);
@@ -95,38 +114,29 @@ module.exports = {
       let caption =
         `🎥 *YouTube Results*\n` +
         `🔎 *Query:* ${query}\n\n` +
-        `↩️ Reply *1-5* to choose\n\n`;
+        `↩️ Reply *1-5* (no prefix needed)\n\n`;
 
       top.forEach((v, i) => {
         caption += `*${i + 1}.* ${v.title}\n`;
         caption += `⏱ ${v?.duration?.timestamp || 'N/A'}\n`;
-        caption += `👤 ${v?.author?.name || 'Unknown'}\n`;
         caption += `👁 ${formatViews(v?.views)} views\n\n`;
       });
 
       const thumb = top[0]?.thumbnail;
 
-      const listMsg = await sock.sendMessage(
+      await sock.sendMessage(
         chatId,
         thumb ? { image: { url: thumb }, caption } : { text: caption },
         { quoted: message }
       );
 
-      await clearSession(sessionKey);
+      SESSIONS.set(sessionKey, { videos: top });
 
-      const timeout = setTimeout(async () => {
-        await clearSession(sessionKey);
-      }, 5 * 60 * 1000);
-
-      SESSIONS.set(sessionKey, {
-        listMsgId: listMsg.key.id,
-        videos: top,
-        timeout
-      });
+      setTimeout(() => SESSIONS.delete(sessionKey), 5 * 60 * 1000);
 
     } catch (err) {
-      console.error('YT plugin error:', err?.message || err);
-      return await sendText('❌ Error while searching.');
+      console.error(err.message);
+      return sendText('❌ Error while searching.');
     }
   }
 };
