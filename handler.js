@@ -527,6 +527,8 @@ const handleMessage = async (sock, msg) => {
       
       if (resolvedMenuCmd) {
         body = resolvedMenuCmd;
+        // If it was a menu command, we reset it to the resolved command and let the parser handle it.
+        // We do NOT return here, so it can be parsed as a command.
       } else if (/^\d+$/.test(body)) {
         // Only check film2 if it wasn't a menu reply
         const film2Module = require('./commands/movies/film2');
