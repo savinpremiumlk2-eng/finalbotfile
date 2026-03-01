@@ -1,5 +1,5 @@
 /**
- * YouTube Search & Direct Download (No Selection)
+ * YouTube Auto Search & Download (Fixed for Qasim API)
  */
 
 const axios = require('axios');
@@ -24,9 +24,9 @@ module.exports = {
 
       await react("⏳");
 
-      // 🔎 SEARCH
+      // 🔎 SEARCH FIRST RESULT
       const searchRes = await axios.get(SEARCH_API, {
-        timeout: 25000,
+        timeout: 30000,
         params: {
           apiKey: API_KEY,
           query,
@@ -41,28 +41,30 @@ module.exports = {
 
       const video = searchRes.data.data.videos[0];
 
-      // ⬇️ DOWNLOAD FIRST RESULT
+      // ⬇️ DOWNLOAD VIDEO (360p)
       const downloadRes = await axios.get(DOWNLOAD_API, {
         timeout: 60000,
         params: {
           apiKey: API_KEY,
           url: video.url,
-          format: 'mp4'
+          format: 360
         }
       });
 
-      if (!downloadRes.data?.success || !downloadRes.data?.data?.downloadUrl) {
+      if (!downloadRes.data?.success || !downloadRes.data?.data?.download) {
         await react("❌");
-        return reply("❌ Download API failed.");
+        return reply("❌ Download failed.");
       }
 
-      const downloadUrl = downloadRes.data.data.downloadUrl;
+      const fileUrl = downloadRes.data.data.download;
 
       await sock.sendMessage(from, {
-        video: { url: downloadUrl },
-        caption: `🎬 *${video.title || "YouTube Video"}*
-⏱ ${video?.duration?.timestamp || "N/A"}
-👁 ${formatViews(video?.views)} views
+        video: { url: fileUrl },
+        caption: `🎬 *${downloadRes.data.data.title}*
+👤 ${downloadRes.data.data.author}
+⏱ ${downloadRes.data.data.duration}
+👁 ${downloadRes.data.data.views}
+📺 360p
 
 > 💫 INFINITY MD`
       }, { quoted: msg });
@@ -72,15 +74,7 @@ module.exports = {
     } catch (err) {
       console.log(err.response?.data || err.message);
       await react("❌");
-      reply("❌ Error while processing.");
+      reply("❌ Error while processing request.");
     }
   }
 };
-
-// 👁 View Formatter
-function formatViews(views) {
-  if (!views) return "0";
-  if (views >= 1_000_000) return (views / 1_000_000).toFixed(1) + "M";
-  if (views >= 1_000) return (views / 1_000).toFixed(1) + "K";
-  return views.toString();
-}
