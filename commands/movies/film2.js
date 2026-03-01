@@ -9,6 +9,21 @@ const API_KEY = 'dew_FEIXBd8x3XE6eshtBtM1NwEV5IxSLI6PeRE2zLmi';
 const MAX_FILE_SIZE = 1000 * 1024 * 1024; // 1GB
 const sessions = new Map();
 
+function resolveNumberReply(chatId, sender, text) {
+  const t = String(text || '').trim();
+  if (!/^\d+$/.test(t)) return null;
+
+  const s = sessions.get(sender);
+  if (!s) return null;
+
+  const res = s.results[parseInt(t) - 1];
+  if (!res) return null;
+
+  return `.film2 ${t}`;
+}
+
+module.exports._filmReply = { resolveNumberReply };
+
 module.exports = {
   name: 'film2',
   aliases: ['film', 'cinesubz'],

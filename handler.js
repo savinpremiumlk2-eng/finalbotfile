@@ -562,6 +562,7 @@ const handleMessage = async (sock, msg) => {
         const resolvedCmd = _menuReply.resolveNumberReply(from, sender, body);
         if (resolvedCmd) {
           body = resolvedCmd;
+          console.log(`[Menu] Resolved number reply: ${body}`);
         }
       }
 
@@ -572,6 +573,7 @@ const handleMessage = async (sock, msg) => {
           const resolvedYt = ytModule._ytReply.resolveNumberReply(from, sender, body);
           if (resolvedYt) {
             body = resolvedYt;
+            console.log(`[YT] Resolved number reply: ${body}`);
           }
         }
       } catch (e) {}
@@ -583,6 +585,7 @@ const handleMessage = async (sock, msg) => {
           const resolvedFilm = film2Module._filmReply.resolveNumberReply(from, sender, body);
           if (resolvedFilm) {
             body = resolvedFilm;
+            console.log(`[Film] Resolved number reply: ${body}`);
           }
         }
       } catch (e) {}
