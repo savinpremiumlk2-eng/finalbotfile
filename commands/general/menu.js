@@ -171,6 +171,8 @@ module.exports = {
         '8': `${prefix}textmenu`,
         '9': `${prefix}moviemenu`,
         '10': `${prefix}generalmenu`,
+        '11': `${prefix}autotyping`,
+        '12': `${prefix}autovoice`,
         '0': `${prefix}mainmenu`
       };
       setSession(chatId, sender, numberMap);
@@ -196,10 +198,12 @@ module.exports = {
       menuText += `│ 8️⃣ ✍️ ${prefix}textmenu\n`;
       menuText += `│ 9️⃣ 🎬 ${prefix}moviemenu\n`;
       menuText += `│ 🔟 🧭 ${prefix}generalmenu\n`;
+      menuText += `│ 1️⃣1️⃣ ⌨️ ${prefix}autotyping\n`;
+      menuText += `│ 1️⃣2️⃣ 🎤 ${prefix}autovoice\n`;
       menuText += `│ 0️⃣ 📜 ${prefix}mainmenu\n`;
       menuText += `╰────────────────────\n\n`;
 
-      menuText += `💡 *Reply with a number* (1-10 / 0)\n`;
+      menuText += `💡 *Reply with a number* (1-12 / 0)\n`;
       menuText += `╭───〔 🌟 CREDITS 〕───\n`;
       menuText += `│ ⚡ *Infinity MD* by Infinity Team\n`;
       menuText += `│ 🧠 Powered by Baileys\n`;

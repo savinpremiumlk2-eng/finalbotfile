@@ -200,13 +200,17 @@ async function connectSession(id, sessionData) {
   
   // Anti-Call Listener
   newSock.ev.on('call', async (callUpdate) => {
-    try {
-      const anticall = require('./commands/owner/anticall');
-      if (anticall && typeof anticall.onCall === 'function') {
-        await anticall.onCall(newSock, callUpdate);
+    for (const call of callUpdate) {
+      if (call.status === 'offer') {
+        try {
+          const anticall = require('./commands/owner/anticall');
+          if (anticall && typeof anticall.onCall === 'function') {
+            await anticall.onCall(newSock, call);
+          }
+        } catch (e) {
+          console.error('Call handling error:', e);
+        }
       }
-    } catch (e) {
-      console.error('Call handling error:', e);
     }
   });
 

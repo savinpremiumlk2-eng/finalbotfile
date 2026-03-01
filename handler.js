@@ -429,9 +429,21 @@ const handleMessage = async (sock, msg) => {
       return; // Ignore messages in maintenance mode unless sender is owner
     }
 
+    // Auto-Typing & Auto-Voice System
+    try {
+      if (effectiveSettings.autoTyping || config.autoTyping) {
+        await sock.sendPresenceUpdate('composing', from);
+      }
+      if (effectiveSettings.autoVoice || config.autoVoice) {
+        await sock.sendPresenceUpdate('recording', from);
+      }
+    } catch (e) {}
+
     // Auto-React System
     try {
       const autoReactEnabled = effectiveSettings.autoReact || config.autoReact;
+      const autoReactMode = effectiveSettings.autoReactMode || config.autoReactMode || 'bot';
+
       if (autoReactEnabled && msg.message && !msg.key.fromMe) {
         const content = msg.message.ephemeralMessage?.message || msg.message;
         const text =
@@ -443,19 +455,21 @@ const handleMessage = async (sock, msg) => {
         const emojis = ['❤️','🔥','👌','💀','😁','✨','👍','🤨','😎','😂','🤝','💫'];
         
         const prefixList = ['.', '/', '#', '!', '/'];
-        if (text && prefixList.includes(text.trim()[0])) {
+        const isCmd = text && prefixList.includes(text.trim()[0]);
+
+        if (isCmd) {
           await sock.sendMessage(jid, {
             react: { text: '⏳', key: msg.key }
           });
         }
 
-        // Mode check - default to 'all' if not specified
-        const mode = config.mode || 'all';
-        if (mode === 'all') {
-          const rand = emojis[Math.floor(Math.random() * emojis.length)];
-          await sock.sendMessage(jid, {
-            react: { text: rand, key: msg.key }
-          });
+        if (autoReactMode === 'all' || (autoReactMode === 'bot' && isCmd)) {
+           if (autoReactMode === 'all' && !isCmd) {
+             const rand = emojis[Math.floor(Math.random() * emojis.length)];
+             await sock.sendMessage(jid, {
+               react: { text: rand, key: msg.key }
+             });
+           }
         }
       }
     } catch (e) {
@@ -507,19 +521,27 @@ const handleMessage = async (sock, msg) => {
     }
     
     // Anti-Delete System
-    if (effectiveSettings.antidelete && msg.message?.protocolMessage?.type === 0) {
+    const isPrivate = !isGroup;
+    const adEnabled = effectiveSettings.antidelete;
+    const adPrivate = globalSettings.antideletePrivate ?? true;
+    const adGroup = globalSettings.antideleteGroup ?? true;
+
+    if (adEnabled && msg.message?.protocolMessage?.type === 0) {
        const key = msg.message.protocolMessage.key;
        const deletedMsg = await database.getDeletedMessage(key.id);
        if (deletedMsg) {
-         const targetNum = sock._customConfig?.ownerNumber || config.ownerNumber[0];
-         const jid = targetNum.includes('@') ? targetNum : `${targetNum}@s.whatsapp.net`;
-         const note = `🛡️ *Anti-Delete Detected*\n\n*From:* @${deletedMsg.sender.split('@')[0]}\n*Type:* ${deletedMsg.type}\n\n*Content:* ${deletedMsg.body || 'Media/Unsupported'}`;
-         await sock.sendMessage(jid, { text: note, mentions: [deletedMsg.sender] });
+         const shouldNotify = (isPrivate && adPrivate) || (isGroup && adGroup);
+         if (shouldNotify) {
+           const targetNum = sock._customConfig?.ownerNumber || config.ownerNumber[0];
+           const jid = targetNum.includes('@') ? targetNum : `${targetNum}@s.whatsapp.net`;
+           const note = `🛡️ *Anti-Delete Detected*\n\n*From:* @${deletedMsg.sender.split('@')[0]}\n*Chat:* ${isGroup ? 'Group' : 'Private'}\n*Type:* ${deletedMsg.type}\n\n*Content:* ${deletedMsg.body || 'Media/Unsupported'}`;
+           await sock.sendMessage(jid, { text: note, mentions: [deletedMsg.sender] });
+         }
        }
     }
     
     // Store message for anti-delete
-    if (effectiveSettings.antidelete && !msg.key.fromMe && !isSystemJid(from)) {
+    if (adEnabled && !msg.key.fromMe && !isSystemJid(from)) {
        // body is not defined yet here, let's fix the order or get it
        let msgBody = '';
        if (content) {
@@ -577,21 +599,28 @@ const handleMessage = async (sock, msg) => {
           }
         }
       } catch (e) {}
+    } catch (e) {}
 
-      // Film2 Numeric Reply
-      try {
-        const film2Module = require('./commands/movies/film2');
-        if (film2Module && film2Module._filmReply) {
-          const resolvedFilm = film2Module._filmReply.resolveNumberReply(from, sender, body);
-          if (resolvedFilm) {
-            body = resolvedFilm;
-            console.log(`[Film] Resolved number reply: ${body}`);
-          }
+    // Film2 Numeric Reply
+    try {
+      const film2Module = require('./commands/movies/film2');
+      if (film2Module) {
+        // The film2 module uses its own internal sessions map and logic inside execute.
+        // If it's a number and we have a session, we should trigger the command.
+        if (/^\d+$/.test(body)) {
+           const args = [body];
+           const command = commands.get('film2') || cmdRegistry.get('film2');
+           if (command) {
+              await (command.handler || command.execute)(sock, msg, args, {
+                from, sender, isGroup, groupMetadata, 
+                isOwner: isOwner(sender, sock),
+                reply: (text) => sock.sendMessage(from, { text }, { quoted: msg })
+              });
+              return; // Stop further processing if it was a film2 reply
+           }
         }
-      } catch (e) {}
-    } catch (e) {
-      // console.error('Number reply error:', e.message);
-    }
+      }
+    } catch (e) {}
 
     // Command Parser
     const prefixList = [config.prefix, '/', '#', '!', '.'];
