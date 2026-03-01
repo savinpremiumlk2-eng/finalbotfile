@@ -398,17 +398,10 @@ const isSystemJid = (jid) => {
 // Main message handler
 const handleMessage = async (sock, msg) => {
   try {
-    // Debug logging to see all messages
-    // Debug log removed
-    
-    if (!msg.message) return;
+    if (!msg || !msg.message || !sock || !sock.user) return;
     
     const from = msg.key.remoteJid;
-    
-    // System message filter - ignore broadcast/status/newsletter messages
-    if (isSystemJid(from)) {
-      return; // Silently ignore system messages
-    }
+    if (isSystemJid(from)) return;
     
     // Clear cache to get fresh config values
     delete require.cache[require.resolve('./config')];
@@ -426,16 +419,16 @@ const handleMessage = async (sock, msg) => {
 
     // Maintenance Mode Check
     if (globalSettings.maintenance && !isOwner(sender, sock)) {
-      return; // Ignore messages in maintenance mode unless sender is owner
+      return;
     }
 
     // Auto-Typing & Auto-Voice System
     try {
       if (effectiveSettings.autoTyping || config.autoTyping) {
-        await sock.sendPresenceUpdate('composing', from);
+        await sock.sendPresenceUpdate('composing', from).catch(() => {});
       }
       if (effectiveSettings.autoVoice || config.autoVoice) {
-        await sock.sendPresenceUpdate('recording', from);
+        await sock.sendPresenceUpdate('recording', from).catch(() => {});
       }
     } catch (e) {}
 
@@ -446,74 +439,35 @@ const handleMessage = async (sock, msg) => {
 
       if (autoReactEnabled && msg.message && !msg.key.fromMe) {
         const content = msg.message.ephemeralMessage?.message || msg.message;
-        const text =
-          content.conversation ||
-          content.extendedTextMessage?.text ||
-          '';
-
+        const text = content.conversation || content.extendedTextMessage?.text || '';
         const jid = msg.key.remoteJid;
         const emojis = ['❤️','🔥','👌','💀','😁','✨','👍','🤨','😎','😂','🤝','💫'];
-        
         const prefixList = ['.', '/', '#', '!', '/'];
         const isCmd = text && prefixList.includes(text.trim()[0]);
 
         if (isCmd) {
-          await sock.sendMessage(jid, {
-            react: { text: '⏳', key: msg.key }
-          });
+          await sock.sendMessage(jid, { react: { text: '⏳', key: msg.key } }).catch(() => {});
         }
 
         if (autoReactMode === 'all' || (autoReactMode === 'bot' && isCmd)) {
            if (autoReactMode === 'all' && !isCmd) {
              const rand = emojis[Math.floor(Math.random() * emojis.length)];
-             await sock.sendMessage(jid, {
-               react: { text: rand, key: msg.key }
-             });
+             await sock.sendMessage(jid, { react: { text: rand, key: msg.key } }).catch(() => {});
            }
         }
       }
-    } catch (e) {
-      console.error('[AutoReact Error]', e.message);
-    }
+    } catch (e) {}
     
-    // Unwrap containers first
     const content = getMessageContent(msg);
-    // Note: We don't return early if content is null because forwarded status messages might not have content
-    
-    // Still check for actual message content for regular processing
     let actualMessageTypes = [];
     if (content) {
       const allKeys = Object.keys(content);
-      // Filter out protocol/system messages and find actual message content
       const protocolMessages = ['protocolMessage', 'senderKeyDistributionMessage', 'messageContextInfo'];
       actualMessageTypes = allKeys.filter(key => !protocolMessages.includes(key));
     }
-    
-    // We'll check for empty content later after we've processed group messages
-    
-    // Use the first actual message type (conversation, extendedTextMessage, etc.)
     const messageType = actualMessageTypes[0];
-    
-    // from already defined above in DM block check
-    const isGroup = from.endsWith('@g.us'); // Should always be true now due to DM block above
-    
-    // Fetch group metadata immediately if it's a group
+    const isGroup = from.endsWith('@g.us');
     const groupMetadata = isGroup ? await getGroupMetadata(sock, from) : null;
-    
-    // Anti-group mention protection (check BEFORE prefix check, as these are non-command messages)
-    if (isGroup) {
-      // Debug logging to confirm we're trying to call the handler
-      const groupSettings = database.getGroupSettings(from);
-      // Debug log removed
-      if (groupSettings.antigroupmention) {
-        // Debug log removed
-      }
-      try {
-        await handleAntigroupmention(sock, msg, groupMetadata);
-      } catch (error) {
-        console.error('Error in antigroupmention handler:', error);
-      }
-    }
     
     // Track group message statistics
     if (isGroup) {
@@ -535,14 +489,12 @@ const handleMessage = async (sock, msg) => {
            const targetNum = sock._customConfig?.ownerNumber || config.ownerNumber[0];
            const jid = targetNum.includes('@') ? targetNum : `${targetNum}@s.whatsapp.net`;
            const note = `🛡️ *Anti-Delete Detected*\n\n*From:* @${deletedMsg.sender.split('@')[0]}\n*Chat:* ${isGroup ? 'Group' : 'Private'}\n*Type:* ${deletedMsg.type}\n\n*Content:* ${deletedMsg.body || 'Media/Unsupported'}`;
-           await sock.sendMessage(jid, { text: note, mentions: [deletedMsg.sender] });
+           await sock.sendMessage(jid, { text: note, mentions: [deletedMsg.sender] }).catch(() => {});
          }
        }
     }
     
-    // Store message for anti-delete
     if (adEnabled && !msg.key.fromMe && !isSystemJid(from)) {
-       // body is not defined yet here, let's fix the order or get it
        let msgBody = '';
        if (content) {
          if (content.conversation) msgBody = content.conversation;
@@ -550,7 +502,6 @@ const handleMessage = async (sock, msg) => {
          else if (content.imageMessage) msgBody = content.imageMessage.caption || '';
          else if (content.videoMessage) msgBody = content.videoMessage.caption || '';
        }
-
        database.saveDeletedMessage(msg.key.id, {
          sender,
          type: messageType,
@@ -559,65 +510,83 @@ const handleMessage = async (sock, msg) => {
        });
     }
     
-    // Return early for non-group messages with no recognizable content
     if (!content || actualMessageTypes.length === 0) return;
     
-    // Get message body from unwrapped content
     let body = '';
-    if (content.conversation) {
-      body = content.conversation;
-    } else if (content.extendedTextMessage) {
-      body = content.extendedTextMessage.text || '';
-    } else if (content.imageMessage) {
-      body = content.imageMessage.caption || '';
-    } else if (content.videoMessage) {
-      body = content.videoMessage.caption || '';
-    }
+    if (content.conversation) body = content.conversation;
+    else if (content.extendedTextMessage) body = content.extendedTextMessage.text || '';
+    else if (content.imageMessage) body = content.imageMessage.caption || '';
+    else if (content.videoMessage) body = content.videoMessage.caption || '';
     
     body = (body || '').trim();
 
-    // Check for numeric replies (Submenu Navigation)
+    // Numeric Replies (Consolidated)
     try {
       const menuModule = require('./commands/general/menu');
-      const _menuReply = menuModule._menuReply;
-      if (_menuReply) {
-        const resolvedCmd = _menuReply.resolveNumberReply(from, sender, body);
-        if (resolvedCmd) {
-          body = resolvedCmd;
-          console.log(`[Menu] Resolved number reply: ${body}`);
+      if (menuModule._menuReply) {
+        const resolvedCmd = menuModule._menuReply.resolveNumberReply(from, sender, body);
+        if (resolvedCmd) body = resolvedCmd;
+      }
+
+      const ytModule = require('./commands/media/yt');
+      if (ytModule && ytModule._ytReply) {
+        const resolvedYt = ytModule._ytReply.resolveNumberReply(from, sender, body);
+        if (resolvedYt) body = resolvedYt;
+      }
+
+      if (/^\d+$/.test(body)) {
+        const film2Module = require('./commands/movies/film2');
+        if (film2Module) {
+           const command = commands.get('film2') || cmdRegistry.get('film2');
+           if (command) {
+              await (command.handler || command.execute)(sock, msg, [body], {
+                from, sender, isGroup, groupMetadata, 
+                isOwner: isOwner(sender, sock),
+                reply: (text) => sock.sendMessage(from, { text }, { quoted: msg }).catch(() => {})
+              });
+              return; 
+           }
         }
       }
 
-      // YouTube Numeric Reply
-      try {
-        const ytModule = require('./commands/media/yt');
-        if (ytModule && ytModule._ytReply) {
-          const resolvedYt = ytModule._ytReply.resolveNumberReply(from, sender, body);
-          if (resolvedYt) {
-            body = resolvedYt;
-            console.log(`[YT] Resolved number reply: ${body}`);
+      // Check for numerical replies to film commands (SriHub/Cinesubz)
+      if (isGroup && content.extendedTextMessage?.contextInfo?.stanzaId) {
+        const stanzaId = content.extendedTextMessage.contextInfo.stanzaId;
+        const choice = parseInt(body);
+        if (!isNaN(choice)) {
+          const store = require('./lib/lightweight_store');
+          const sriKey = `srihub_${from}_${sender}`;
+          const cineKey = `cinesubz_${from}_${sender}`;
+          let session = await store.getSetting('sessions', sriKey);
+          let type = 'srihub';
+          if (!session || session.msgId !== stanzaId) {
+            session = await store.getSetting('sessions', cineKey);
+            type = 'cinesubz';
           }
-        }
-      } catch (e) {}
-    } catch (e) {}
-
-    // Film2 Numeric Reply
-    try {
-      const film2Module = require('./commands/movies/film2');
-      if (film2Module) {
-        // The film2 module uses its own internal sessions map and logic inside execute.
-        // If it's a number and we have a session, we should trigger the command.
-        if (/^\d+$/.test(body)) {
-           const args = [body];
-           const command = commands.get('film2') || cmdRegistry.get('film2');
-           if (command) {
-              await (command.handler || command.execute)(sock, msg, args, {
-                from, sender, isGroup, groupMetadata, 
-                isOwner: isOwner(sender, sock),
-                reply: (text) => sock.sendMessage(from, { text }, { quoted: msg })
-              });
-              return; // Stop further processing if it was a film2 reply
-           }
+          if (session && session.msgId === stanzaId && (Date.now() - session.timestamp < 600000)) {
+            const url = session.results[choice - 1];
+            if (url) {
+              await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } }).catch(() => {});
+              await sock.sendMessage(from, { text: `📥 Fetching file for: ${url}\nThis may take a moment...` }, { quoted: msg }).catch(() => {});
+              const apiKey = type === 'srihub' ? 'dew_kuKmHwBBCgIAdUty5TBY1VWWtUgwbQwKRtC8MFUF' : 'dew_FEIXBd8x3XE6eshtBtM1NwEV5IxSLI6PeRE2zLmi';
+              const dlEndpoint = type === 'srihub' ? 'https://api.srihub.store/movie/srihubdl' : 'https://api.srihub.store/movie/cinesubzdl';
+              try {
+                const axios = require('axios');
+                const dlRes = await axios.get(`${dlEndpoint}?url=${encodeURIComponent(url)}&apikey=${apiKey}`);
+                const movie = dlRes.data?.result;
+                const link = movie?.downloadOptions?.[0]?.links?.[0]?.url || movie?.links?.[0]?.url;
+                if (link) {
+                  await sock.sendMessage(from, { 
+                    document: { url: link }, 
+                    mimetype: 'video/mp4', 
+                    fileName: `${(movie.title || 'movie').replace(/\s+/g, '_')}.mp4`,
+                    caption: `🎥 *${movie.title || 'Movie'}*\n\n> *INFINITY MD*`
+                  }, { quoted: msg }).catch(() => {});
+                }
+              } catch (err) {}
+              return;
+            }
+          }
         }
       }
     } catch (e) {}
@@ -629,308 +598,109 @@ const handleMessage = async (sock, msg) => {
     if (usedPrefix) {
       const args = body.slice(usedPrefix.length).trim().split(/ +/);
       const commandName = args.shift().toLowerCase();
-      
-      // Try to get command from either registry
       const command = commands.get(commandName) || cmdRegistry.get(commandName);
 
       if (command) {
-        console.log(`[Command] Executing: ${commandName} for ${sender}`);
-        const globalSettings = database.getGlobalSettings();
         if (globalSettings.forceBot && !isOwner(sender, sock)) {
-           await sock.sendMessage(from, { text: '⚠️ *Force Bot Mode is ON.*\nOnly owners can use commands right now.' }, { quoted: msg });
+           await sock.sendMessage(from, { text: '⚠️ *Force Bot Mode is ON.*\nOnly owners can use commands right now.' }, { quoted: msg }).catch(() => {});
            return;
         }
 
-        // Execute command
         try {
-          // React with loading emoji
-          await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } });
-
-          // Check for handler (some use handler, some use execute)
+          await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } }).catch(() => {});
           const executeFn = command.handler || command.execute;
           if (executeFn) {
             await executeFn(sock, msg, args, {
-              from,
-              sender,
-              isGroup,
-              groupMetadata,
+              from, sender, isGroup, groupMetadata,
               isOwner: isOwner(sender, sock),
               isAdmin: await isAdmin(sock, sender, from, groupMetadata),
               isBotAdmin: await isBotAdmin(sock, from, groupMetadata),
               isMod: isMod(sender),
               commandName,
-              reply: (text) => sock.sendMessage(from, { text }, { quoted: msg }),
-              react: (emoji) => sock.sendMessage(from, { react: { text: emoji, key: msg.key } })
+              reply: (text) => sock.sendMessage(from, { text }, { quoted: msg }).catch(() => {}),
+              react: (emoji) => sock.sendMessage(from, { react: { text: emoji, key: msg.key } }).catch(() => {})
             });
-
-            // React with done emoji after success
-            await sock.sendMessage(from, { react: { text: '✅', key: msg.key } });
+            await sock.sendMessage(from, { react: { text: '✅', key: msg.key } }).catch(() => {});
           } else {
-             // Fallback if no execute function found
-             await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
+             await sock.sendMessage(from, { react: { text: '❌', key: msg.key } }).catch(() => {});
           }
         } catch (error) {
           console.error(`Error executing command ${commandName}:`, error);
-          // React with error emoji
-          await sock.sendMessage(from, { react: { text: '❌', key: msg.key } });
+          await sock.sendMessage(from, { react: { text: '❌', key: msg.key } }).catch(() => {});
         }
-        return;
-      } else {
-        // Not a recognized command, but has prefix. 
-        // Silently return to avoid sending error messages for non-commands.
         return;
       }
     }
     
-    // Check antiall protection (owner only feature)
+    // Group Protections
     if (isGroup) {
       const groupSettings = database.getGroupSettings(from);
-      if (groupSettings.antiall) {
-        const senderIsAdmin = await isAdmin(sock, sender, from, groupMetadata);
-        const senderIsOwner = isOwner(sender);
-        
-        if (!senderIsAdmin && !senderIsOwner) {
-          const botIsAdmin = await isBotAdmin(sock, from, groupMetadata);
-          if (botIsAdmin) {
-            await sock.sendMessage(from, { delete: msg.key });
-            return;
-          }
+      if (groupSettings.antiall && !isOwner(sender) && !(await isAdmin(sock, sender, from, groupMetadata))) {
+        if (await isBotAdmin(sock, from, groupMetadata)) {
+          await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+          return;
         }
       }
       
-      // Anti-tag protection (check BEFORE text check, as tagall can have no text)
       if (groupSettings.antitag && !msg.key.fromMe) {
         const ctx = content.extendedTextMessage?.contextInfo;
         const mentionedJids = ctx?.mentionedJid || [];
-        
-        const messageText = (
-          body ||
-          content.imageMessage?.caption ||
-          content.videoMessage?.caption ||
-          ''
-        );
-        
-        const textMentions = messageText.match(/@[\d+\s\-()~.]+/g) || [];
+        const messageText = body || content.imageMessage?.caption || content.videoMessage?.caption || '';
         const numericMentions = messageText.match(/@\d{10,}/g) || [];
-        
         const uniqueNumericMentions = new Set();
         numericMentions.forEach((mention) => {
           const numMatch = mention.match(/@(\d+)/);
           if (numMatch) uniqueNumericMentions.add(numMatch[1]);
         });
-        
-        const mentionedJidCount = mentionedJids.length;
-        const numericMentionCount = uniqueNumericMentions.size;
-        const totalMentions = Math.max(mentionedJidCount, numericMentionCount);
+        const totalMentions = Math.max(mentionedJids.length, uniqueNumericMentions.size);
         
         if (totalMentions >= 3) {
-          try {
-            const participants = groupMetadata.participants || [];
-            const mentionThreshold = Math.max(3, Math.ceil(participants.length * 0.5));
-            const hasManyNumericMentions = numericMentionCount >= 10 ||
-              (numericMentionCount >= 5 && numericMentionCount >= mentionThreshold);
-            
-            if (totalMentions >= mentionThreshold || hasManyNumericMentions) {
-              const senderIsAdmin = await isAdmin(sock, sender, from, groupMetadata);
-              const senderIsOwner = isOwner(sender);
-              
-              if (!senderIsAdmin && !senderIsOwner) {
-                const action = (groupSettings.antitagAction || 'delete').toLowerCase();
-                
-                if (action === 'delete') {
-                  try {
-                    await sock.sendMessage(from, { delete: msg.key });
-                    await sock.sendMessage(from, { 
-                      text: '⚠️ *Tagall Detected!*',
-                      mentions: [sender]
-                    }, { quoted: msg });
-                  } catch (e) {
-                    console.error('Failed to delete tagall message:', e);
-                  }
-                } else if (action === 'kick') {
-                  try {
-                    await sock.sendMessage(from, { delete: msg.key });
-                  } catch (e) {
-                    console.error('Failed to delete tagall message:', e);
-                  }
-                  
-                  const botIsAdmin = await isBotAdmin(sock, from, groupMetadata);
-                  if (botIsAdmin) {
-                    try {
-                      await sock.groupParticipantsUpdate(from, [sender], 'remove');
-                    } catch (e) {
-                      console.error('Failed to kick for antitag:', e);
-                    }
-                    const usernames = [`@${sender.split('@')[0]}`];
-                    await sock.sendMessage(from, {
-                      text: `🚫 *Antitag Detected!*\n\n${usernames.join(', ')} has been kicked for tagging all members.`,
-                      mentions: [sender],
-                    }, { quoted: msg });
-                  }
-                }
-                return;
+          const participants = groupMetadata.participants || [];
+          const mentionThreshold = Math.max(3, Math.ceil(participants.length * 0.5));
+          if (totalMentions >= mentionThreshold || uniqueNumericMentions.size >= 10) {
+            const senderIsAdmin = await isAdmin(sock, sender, from, groupMetadata);
+            if (!senderIsAdmin && !isOwner(sender)) {
+              const action = (groupSettings.antitagAction || 'delete').toLowerCase();
+              if (action === 'delete' || action === 'kick') {
+                await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+              }
+              if (action === 'kick' && await isBotAdmin(sock, from, groupMetadata)) {
+                await sock.groupParticipantsUpdate(from, [sender], 'remove').catch(() => {});
+                await sock.sendMessage(from, { text: `🚫 *Antitag Detected!*\n@${sender.split('@')[0]} has been kicked.`, mentions: [sender] }).catch(() => {});
               }
             }
-          } catch (e) {
-            console.error('Error during anti-tag enforcement:', e);
           }
         }
       }
-    }
-    
-    // Anti-group mention protection (check BEFORE prefix check, as these are non-command messages)
-    if (isGroup) {
-      // Debug logging to confirm we're trying to call the handler
-      const groupSettings = database.getGroupSettings(from);
+
       if (groupSettings.antigroupmention) {
-        // Debug log removed
+        await handleAntigroupmention(sock, msg, groupMetadata).catch(() => {});
       }
-      try {
-        await handleAntigroupmention(sock, msg, groupMetadata);
-      } catch (error) {
-        console.error('Error in antigroupmention handler:', error);
-      }
-    }
-    
-    // AutoSticker feature - convert images/videos to stickers automatically
-    if (isGroup) { // Process all messages in groups (including bot's own messages)
-      const groupSettings = database.getGroupSettings(from);
+
       if (groupSettings.autosticker) {
         const mediaMessage = content?.imageMessage || content?.videoMessage;
-        
-        // Only process if it's an image or video (not documents)
-        if (mediaMessage) {
-          // Skip if message has a command prefix (let command handle it)
-          if (!body.startsWith(config.prefix)) {
-            try {
-              // Import sticker command logic
-              const stickerCmd = commands.get('sticker');
-              if (stickerCmd) {
-                // Execute sticker conversion silently
-                await stickerCmd.execute(sock, msg, [], {
-                  from,
-                  sender,
-                  isGroup,
-                  groupMetadata,
-                  isOwner: isOwner(sender),
-                  isAdmin: await isAdmin(sock, sender, from, groupMetadata),
-                  isBotAdmin: await isBotAdmin(sock, from, groupMetadata),
-                  isMod: isMod(sender),
-                  reply: (text) => sock.sendMessage(from, { text }, { quoted: msg }),
-                  react: (emoji) => sock.sendMessage(from, { react: { text: emoji, key: msg.key } })
-                });
-                return; // Don't process as command after auto-converting
-              }
-            } catch (error) {
-              console.error('[AutoSticker Error]:', error);
-              // Continue to normal processing if autosticker fails
-            }
-          }
-        }
-      }
-    }
-    
-    // Check for numerical replies to film commands
-    if (isGroup && content.extendedTextMessage?.contextInfo?.stanzaId) {
-      const stanzaId = content.extendedTextMessage.contextInfo.stanzaId;
-      const replyText = body.trim();
-      const choice = parseInt(replyText);
-      
-      if (!isNaN(choice)) {
-        const store = require('./lib/lightweight_store');
-        const sriKey = `srihub_${from}_${sender}`;
-        const cineKey = `cinesubz_${from}_${sender}`;
-        
-        let session = await store.getSetting('sessions', sriKey);
-        let type = 'srihub';
-        
-        if (!session || session.msgId !== stanzaId) {
-          session = await store.getSetting('sessions', cineKey);
-          type = 'cinesubz';
-        }
-
-        if (session && session.msgId === stanzaId && (Date.now() - session.timestamp < 600000)) {
-          const url = session.results[choice - 1];
-          if (url) {
-            await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } });
-            await sock.sendMessage(from, { text: `📥 Fetching file for: ${url}\nThis may take a moment...` }, { quoted: msg });
-            
-            const apiKey = type === 'srihub' ? 'dew_kuKmHwBBCgIAdUty5TBY1VWWtUgwbQwKRtC8MFUF' : 'dew_FEIXBd8x3XE6eshtBtM1NwEV5IxSLI6PeRE2zLmi';
-            const dlEndpoint = type === 'srihub' ? 'https://api.srihub.store/movie/srihubdl' : 'https://api.srihub.store/movie/cinesubzdl';
-            
-            try {
-              const dlRes = await axios.get(`${dlEndpoint}?url=${encodeURIComponent(url)}&apikey=${apiKey}`);
-              const movie = dlRes.data?.result;
-              const link = movie?.downloadOptions?.[0]?.links?.[0]?.url || movie?.links?.[0]?.url;
-              
-              if (link) {
-                await sock.sendMessage(from, { 
-                  document: { url: link }, 
-                  mimetype: 'video/mp4', 
-                  fileName: `${(movie.title || 'movie').replace(/\s+/g, '_')}.mp4`,
-                  caption: `🎥 *${movie.title || 'Movie'}*\n\n> *INFINITY MD*`
-                }, { quoted: msg });
-              } else {
-                await sock.sendMessage(from, { text: '❌ No direct download link found.' }, { quoted: msg });
-              }
-            } catch (err) {
-              await sock.sendMessage(from, { text: `❌ Download Error: ${err.message}` }, { quoted: msg });
-            }
+        if (mediaMessage && !body.startsWith(config.prefix)) {
+          const stickerCmd = commands.get('sticker');
+          if (stickerCmd) {
+            await stickerCmd.execute(sock, msg, [], {
+              from, sender, isGroup, groupMetadata, isOwner: isOwner(sender),
+              isAdmin: await isAdmin(sock, sender, from, groupMetadata),
+              isBotAdmin: await isBotAdmin(sock, from, groupMetadata),
+              isMod: isMod(sender),
+              reply: (text) => sock.sendMessage(from, { text }, { quoted: msg }).catch(() => {}),
+              react: (emoji) => sock.sendMessage(from, { react: { text: emoji, key: msg.key } }).catch(() => {})
+            }).catch(() => {});
             return;
           }
         }
       }
     }
-
-    // Check if message starts with prefix
-    const prefix = config.prefix;
-    if (!body.startsWith(prefix)) return;
-    
-    // Parse command
-    const args = body.slice(prefix.length).trim().split(/\s+/);
-    const commandName = args.shift().toLowerCase();
-    
-    // Get command
-    const command = commands.get(commandName);
-    if (!command) return;
-
-    // Execute command
-    console.log(`Executing command: ${commandName} from ${sender}`);
-
-    const cmdObject = typeof command === 'string' ? commands.get(command) : command;
-
-    await cmdObject.execute(sock, msg, args, {
-      from,
-      sender,
-      isGroup,
-      groupMetadata,
-      isOwner: isOwner(sender),
-      isAdmin: await isAdmin(sock, sender, from, groupMetadata),
-      isBotAdmin: await isBotAdmin(sock, from, groupMetadata),
-      isMod: isMod(sender),
-      reply: (text) => sock.sendMessage(from, { text }, { quoted: msg }),
-      react: (emoji) => sock.sendMessage(from, { react: { text: emoji, key: msg.key } }),
-      commandName: commandName
-    });
-    
   } catch (error) {
     console.error('Error in message handler:', error);
-    
-    // Don't send error messages for rate limit errors
-    if (error.message && error.message.includes('rate-overlimit')) {
-      console.warn('⚠️ Rate limit reached. Skipping error message.');
-      return;
-    }
-    
-    try {
-      await sock.sendMessage(msg.key.remoteJid, { 
-        text: `${config.messages.error}\n\n${error.message}` 
-      }, { quoted: msg });
-    } catch (e) {
-      // Don't log rate limit errors when sending error messages
-      if (!e.message || !e.message.includes('rate-overlimit')) {
-        console.error('Error sending error message:', e);
-      }
+    if (!error.message?.includes('rate-overlimit') && !error.message?.includes('Connection Closed')) {
+      try {
+        await sock.sendMessage(msg.key.remoteJid, { text: `❌ *Error:*\n${error.message}` }, { quoted: msg }).catch(() => {});
+      } catch (e) {}
     }
   }
 };
