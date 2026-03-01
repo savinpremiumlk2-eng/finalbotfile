@@ -38,9 +38,17 @@ module.exports = {
         return reply("❌ Song link missing from API.");
       }
 
+      // Fetch the audio buffer to ensure it's not empty and to send as buffer
+      const audioResponse = await axios.get(song.link, { responseType: 'arraybuffer' });
+      if (!audioResponse.data || audioResponse.data.byteLength < 100) {
+          await react("❌");
+          return reply("❌ The audio file is empty or invalid.");
+      }
+
       await sock.sendMessage(from, {
-        document: { url: song.link },
+        audio: Buffer.from(audioResponse.data),
         mimetype: 'audio/mpeg',
+        ptt: false,
         fileName: song.title || "Sinhanada.mp3",
         caption: `🎵 *${song.title || "Sinhanada Song"}*
 📦 Size: ${song.size || "Unknown"}
