@@ -23,6 +23,7 @@ module.exports = {
   // Bot Behavior
   selfMode: false,
   autoRead: false,
+  autoVoice: true,
   autoTyping: false,
   autoBio: false,
   autoSticker: false,

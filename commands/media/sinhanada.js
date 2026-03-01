@@ -38,38 +38,10 @@ module.exports = {
         return reply("❌ Song link missing from API.");
       }
 
-      // If the link is an HTML page, we need to fetch the actual file link
-      let downloadUrl = song.link;
-      if (downloadUrl.includes('sinhanada.net')) {
-        try {
-          const pageRes = await axios.get(downloadUrl, { 
-            timeout: 15000,
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-          });
-          
-          // Look for direct download link patterns
-          const downloadMatch = pageRes.data.match(/href="(https:\/\/sinhanada\.net\/download\/[^"]+)"/) || 
-                               pageRes.data.match(/href='(https:\/\/sinhanada\.net\/download\/[^']+)'/) ||
-                               pageRes.data.match(/window\.location\.href\s*=\s*"(https:\/\/sinhanada\.net\/download\/[^"]+)"/);
-          
-          if (downloadMatch && downloadMatch[1]) {
-            downloadUrl = downloadMatch[1];
-          } else {
-            // Fallback: look for any .mp3 link in the page
-            const mp3Match = pageRes.data.match(/href="(https:\/\/[^"]+\.mp3)"/);
-            if (mp3Match) downloadUrl = mp3Match[1];
-          }
-        } catch (e) {
-          console.log("Error fetching sinhanada download page:", e.message);
-        }
-      }
-
       await sock.sendMessage(from, {
-        audio: { url: downloadUrl },
-        mimetype: 'audio/mp4',
-        ptt: true,
+        document: { url: song.link },
+        mimetype: 'audio/mpeg',
+        fileName: song.title || "Sinhanada.mp3",
         caption: `🎵 *${song.title || "Sinhanada Song"}*
 📦 Size: ${song.size || "Unknown"}
 
