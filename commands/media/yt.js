@@ -1,101 +1,86 @@
+/**
+ * YouTube Search & Direct Download (No Selection)
+ */
+
 const axios = require('axios');
-const config = require('../../config');
-
-const API_KEY = 'qasim-dev';
-const SEARCH_API = 'https://api.qasimdev.dpdns.org/api/yts/searchVideos';
-const DOWNLOAD_API = 'https://api.qasimdev.dpdns.org/api/youtube/download';
-
-// -------------------- Number reply session (in-memory) --------------------
-const YT_SESSIONS = new Map();
-
-function skey(chatId, sender) {
-  return `${chatId}:${sender}`;
-}
-
-function resolveNumberReply(chatId, sender, text) {
-  const t = String(text || '').trim();
-  if (!/^[1-5]$/.test(t)) return null;
-
-  const s = YT_SESSIONS.get(skey(chatId, sender));
-  if (!s) return null;
-
-  const video = s.videos[parseInt(t) - 1];
-  if (!video) return null;
-
-  return `.yt_download ${video.url}`;
-}
-
-module.exports._ytReply = { resolveNumberReply };
 
 module.exports = {
-  command: 'yt',
-  aliases: ['yts', 'ytsearch', 'yt_download'],
+  name: 'yt',
+  aliases: ['youtube', 'ytdl', 'ytmp4'],
   category: 'media',
-  description: 'Search YouTube and send direct video.',
-  usage: '.yt <keyword>',
+  description: 'Search YouTube and auto download first result',
+  usage: '.yt <search query>',
 
-  async handler(sock, message, args, context = {}) {
-    const chatId = context.chatId || message.key.remoteJid;
-    const senderId = message.key.participant || message.key.remoteJid;
-    const commandName = context.commandName || 'yt';
+  async execute(sock, msg, args, extra) {
+    const { from, reply, react } = extra;
 
-    const sendText = (textMsg) =>
-      sock.sendMessage(chatId, { text: textMsg }, { quoted: message });
-
-    // Handle the internal download command
-    if (commandName === 'yt_download') {
-      const videoUrl = args[0];
-      if (!videoUrl) return;
-
-      await sendText('⬇️ Downloading video...');
-      try {
-        const downloadRes = await axios.get(DOWNLOAD_API, {
-          timeout: 60000,
-          params: { apiKey: API_KEY, url: videoUrl, format: 'mp4' }
-        });
-
-        if (!downloadRes.data?.success || !downloadRes.data?.data?.downloadUrl) {
-          return sendText('❌ Download API failed.');
-        }
-
-        return await sock.sendMessage(chatId, {
-          video: { url: downloadRes.data.data.downloadUrl },
-          caption: `> INFINITY MD`
-        }, { quoted: message });
-      } catch (err) {
-        return sendText('❌ Download failed.');
-      }
-    }
-
-    const query = args.join(' ').trim();
-    if (!query) return;
+    const API_KEY = 'qasim-dev';
+    const SEARCH_API = 'https://api.qasimdev.dpdns.org/api/yts/searchVideos';
+    const DOWNLOAD_API = 'https://api.qasimdev.dpdns.org/api/youtube/download';
 
     try {
-      await sendText('🔎 Searching YouTube...');
-      const res = await axios.get(SEARCH_API, {
+      const query = args.join(" ").trim();
+      if (!query) return reply("❌ Give search text.");
+
+      await react("⏳");
+
+      // 🔎 SEARCH
+      const searchRes = await axios.get(SEARCH_API, {
         timeout: 25000,
-        params: { apiKey: API_KEY, query, limit: 10 }
+        params: {
+          apiKey: API_KEY,
+          query,
+          limit: 1
+        }
       });
 
-      if (!res.data?.success) return sendText('❌ API search failed.');
+      if (!searchRes.data?.success || !searchRes.data?.data?.videos?.length) {
+        await react("❌");
+        return reply("❌ No results found.");
+      }
 
-      const videos = res.data?.data?.videos;
-      if (!Array.isArray(videos) || videos.length === 0) return sendText('❌ No results found.');
+      const video = searchRes.data.data.videos[0];
 
-      const top = videos.slice(0, 5);
-      let caption = `🎥 *YouTube Results*\n🔎 *Query:* ${query}\n\n↩️ Reply *1-5* (no prefix needed)\n\n`;
-
-      top.forEach((v, i) => {
-        caption += `*${i + 1}.* ${v.title}\n⏱ ${v?.duration?.timestamp || 'N/A'}\n👁 ${formatViews(v?.views)} views\n\n`;
+      // ⬇️ DOWNLOAD FIRST RESULT
+      const downloadRes = await axios.get(DOWNLOAD_API, {
+        timeout: 60000,
+        params: {
+          apiKey: API_KEY,
+          url: video.url,
+          format: 'mp4'
+        }
       });
 
-      const thumb = top[0]?.thumbnail;
-      await sock.sendMessage(chatId, thumb ? { image: { url: thumb }, caption } : { text: caption }, { quoted: message });
+      if (!downloadRes.data?.success || !downloadRes.data?.data?.downloadUrl) {
+        await react("❌");
+        return reply("❌ Download API failed.");
+      }
 
-      YT_SESSIONS.set(skey(chatId, senderId), { videos: top });
-      setTimeout(() => YT_SESSIONS.delete(skey(chatId, senderId)), 5 * 60 * 1000);
+      const downloadUrl = downloadRes.data.data.downloadUrl;
+
+      await sock.sendMessage(from, {
+        video: { url: downloadUrl },
+        caption: `🎬 *${video.title || "YouTube Video"}*
+⏱ ${video?.duration?.timestamp || "N/A"}
+👁 ${formatViews(video?.views)} views
+
+> 💫 INFINITY MD`
+      }, { quoted: msg });
+
+      await react("✅");
+
     } catch (err) {
-      return sendText('❌ Error while searching.');
+      console.log(err.response?.data || err.message);
+      await react("❌");
+      reply("❌ Error while processing.");
     }
   }
 };
+
+// 👁 View Formatter
+function formatViews(views) {
+  if (!views) return "0";
+  if (views >= 1_000_000) return (views / 1_000_000).toFixed(1) + "M";
+  if (views >= 1_000) return (views / 1_000).toFixed(1) + "K";
+  return views.toString();
+}
