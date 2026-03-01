@@ -1,6 +1,6 @@
 /**
  * Infinity MD - Film Downloader (Cinesubz)
- * FULLY FIXED & STABLE VERSION
+ * DIRECT STREAM VERSION (No Buffer Crash)
  */
 
 const axios = require('axios');
@@ -8,21 +8,6 @@ const axios = require('axios');
 const API_KEY = 'dew_FEIXBd8x3XE6eshtBtM1NwEV5IxSLI6PeRE2zLmi';
 const MAX_FILE_SIZE = 1000 * 1024 * 1024; // 1GB
 const sessions = new Map();
-
-function resolveNumberReply(chatId, sender, text) {
-  const t = String(text || '').trim();
-  if (!/^\d+$/.test(t)) return null;
-
-  const s = sessions.get(sender);
-  if (!s) return null;
-
-  const res = s.results[parseInt(t) - 1];
-  if (!res) return null;
-
-  return `.film2 ${t}`;
-}
-
-module.exports._filmReply = { resolveNumberReply };
 
 module.exports = {
   name: 'film2',
@@ -32,17 +17,19 @@ module.exports = {
   usage: '.film2 <movie name> OR reply with number',
 
   async execute(sock, msg, args, context = {}) {
+
     const chatId = context.from || msg.key.remoteJid;
     const sender =
       context.sender ||
       msg.key.participant ||
       msg.key.remoteJid;
 
+    const input = args.join(' ').trim();
+
     try {
-      const input = args.join(' ').trim();
 
       // =====================================================
-      // ✅ STEP 1 — HANDLE NUMBER SELECTION
+      // ✅ STEP 1 — NUMBER SELECTION
       // =====================================================
       if (sessions.has(sender) && /^\d+$/.test(input)) {
 
@@ -66,7 +53,7 @@ module.exports = {
         const dlRes = await axios.get(detailsUrl, { timeout: 30000 });
         const movie = dlRes.data?.result || dlRes.data?.data;
 
-        if (!movie || !movie.downloadOptions) {
+        if (!movie?.downloadOptions) {
           sessions.delete(sender);
           return sock.sendMessage(chatId, {
             text: '❌ Failed to fetch download details.'
@@ -74,7 +61,7 @@ module.exports = {
         }
 
         // =============================
-        // ✅ FLATTEN DOWNLOAD LINKS
+        // ✅ FLATTEN LINKS
         // =============================
         const links = [];
 
@@ -96,18 +83,18 @@ module.exports = {
           }, { quoted: msg });
         }
 
-        // Prefer 720p
+        // Prefer 720p → 1080p → first
         const picked =
           links.find(l => l.quality.includes('720')) ||
           links.find(l => l.quality.includes('1080')) ||
           links[0];
 
         await sock.sendMessage(chatId, {
-          text: `⬇️ Selected Quality: ${picked.quality}\n📦 Checking file size...`
+          text: `⬇️ Selected Quality: ${picked.quality}\n📦 Checking size...`
         }, { quoted: msg });
 
         // =============================
-        // ✅ FILE SIZE CHECK
+        // ✅ SIZE CHECK (NO DOWNLOAD)
         // =============================
         let fileSize = 0;
 
@@ -124,47 +111,27 @@ module.exports = {
           }, { quoted: msg });
         }
 
-        // =============================
-        // ✅ DOWNLOAD FILE
-        // =============================
-        let buffer;
-
-        try {
-          const response = await axios.get(picked.url, {
-            responseType: 'arraybuffer',
-            timeout: 300000,
-            maxContentLength: MAX_FILE_SIZE,
-            maxBodyLength: MAX_FILE_SIZE,
-            validateStatus: s => s >= 200 && s < 400
-          });
-
-          buffer = Buffer.from(response.data);
-
-        } catch (err) {
-          sessions.delete(sender);
-          return sock.sendMessage(chatId, {
-            text:
-              `❌ Download failed.\n\n📎 Direct Link:\n${picked.url}`
-          }, { quoted: msg });
-        }
-
         sessions.delete(sender);
 
         // =============================
-        // ✅ SEND AS DOCUMENT
+        // ✅ SEND DIRECT VIDEO URL
         // =============================
         try {
+
           await sock.sendMessage(chatId, {
-            document: buffer,
-            mimetype: 'video/mp4',
-            fileName: `${(selected.title || 'movie').replace(/[^\w\s-]/g, '')}.mp4`,
-            caption: `🎬 ${selected.title || 'Movie'}\n\n> INFINITY MD`
+            video: { url: picked.url },
+            caption:
+              `🎬 *${selected.title || 'Movie'}*\n` +
+              `📀 Quality: ${picked.quality}\n\n` +
+              `> INFINITY MD`
           }, { quoted: msg });
 
-        } catch (sendErr) {
+        } catch (err) {
+
+          // fallback
           return sock.sendMessage(chatId, {
             text:
-              `❌ WhatsApp blocked file.\n\n📎 Direct Link:\n${picked.url}`
+              `❌ WhatsApp blocked video.\n\n📎 Direct Link:\n${picked.url}`
           }, { quoted: msg });
         }
 
@@ -172,7 +139,7 @@ module.exports = {
       }
 
       // =====================================================
-      // ✅ STEP 2 — SEARCH MOVIES
+      // ✅ STEP 2 — SEARCH
       // =====================================================
       if (!input) {
         return sock.sendMessage(chatId, {
@@ -190,7 +157,7 @@ module.exports = {
       const res = await axios.get(searchUrl, { timeout: 30000 });
       const results = res.data?.result || res.data?.data;
 
-      if (!results || !results.length) {
+      if (!results?.length) {
         return sock.sendMessage(chatId, {
           text: '❌ No results found.'
         }, { quoted: msg });
@@ -199,8 +166,7 @@ module.exports = {
       const top = results.slice(0, 10);
 
       let text =
-        `🎬 *Search Results for:* ${input}\n\n` +
-        `Reply with number to download:\n\n`;
+        `🎬 *Search Results for:* ${input}\n\nReply with number to download:\n\n`;
 
       top.forEach((item, i) => {
         text += `*${i + 1}.* ${item.title || item.name}\n`;
@@ -213,7 +179,7 @@ module.exports = {
     } catch (err) {
       console.error('Film2 Error:', err.response?.data || err.message);
 
-      await sock.sendMessage(msg.key.remoteJid, {
+      await sock.sendMessage(chatId, {
         text: '❌ Failed to process request.'
       }, { quoted: msg });
     }
