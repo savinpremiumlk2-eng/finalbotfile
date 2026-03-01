@@ -99,9 +99,19 @@ module.exports = {
         let fileSize = 0;
 
         try {
-          const head = await axios.head(picked.url, { timeout: 15000 });
+          const head = await axios.head(picked.url, { 
+            timeout: 15000,
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+          });
           fileSize = parseInt(head.headers['content-length'] || 0);
         } catch {}
+
+        if (fileSize && fileSize < 1000000) { // Less than 1MB is likely a fake/error page
+           sessions.delete(sender);
+           return sock.sendMessage(chatId, {
+             text: `❌ The server returned a small file (${(fileSize / 1024).toFixed(1)} KB), which might be a fake or error page.\n\n📎 Try Direct Link:\n${picked.url}`
+           }, { quoted: msg });
+        }
 
         if (fileSize && fileSize > MAX_FILE_SIZE) {
           sessions.delete(sender);

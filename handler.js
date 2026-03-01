@@ -523,18 +523,12 @@ const handleMessage = async (sock, msg) => {
     // Numeric Replies (Consolidated)
     try {
       const menuModule = require('./commands/general/menu');
-      if (menuModule._menuReply) {
-        const resolvedCmd = menuModule._menuReply.resolveNumberReply(from, sender, body);
-        if (resolvedCmd) body = resolvedCmd;
-      }
-
-      const ytModule = require('./commands/media/yt');
-      if (ytModule && ytModule._ytReply) {
-        const resolvedYt = ytModule._ytReply.resolveNumberReply(from, sender, body);
-        if (resolvedYt) body = resolvedYt;
-      }
-
-      if (/^\d+$/.test(body)) {
+      const resolvedMenuCmd = (menuModule && menuModule._menuReply) ? menuModule._menuReply.resolveNumberReply(from, sender, body) : null;
+      
+      if (resolvedMenuCmd) {
+        body = resolvedMenuCmd;
+      } else if (/^\d+$/.test(body)) {
+        // Only check film2 if it wasn't a menu reply
         const film2Module = require('./commands/movies/film2');
         if (film2Module) {
            const command = commands.get('film2') || cmdRegistry.get('film2');
@@ -547,6 +541,12 @@ const handleMessage = async (sock, msg) => {
               return; 
            }
         }
+      }
+
+      const ytModule = require('./commands/media/yt');
+      if (ytModule && ytModule._ytReply) {
+        const resolvedYt = ytModule._ytReply.resolveNumberReply(from, sender, body);
+        if (resolvedYt) body = resolvedYt;
       }
 
       // Check for numerical replies to film commands (SriHub/Cinesubz)

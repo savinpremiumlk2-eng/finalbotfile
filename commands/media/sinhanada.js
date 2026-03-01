@@ -39,9 +39,9 @@ module.exports = {
       }
 
       await sock.sendMessage(from, {
-        document: { url: song.link },
-        mimetype: 'audio/mpeg',
-        fileName: song.title || "Sinhanada.mp3",
+        audio: { url: song.link },
+        mimetype: 'audio/mp4',
+        ptt: true,
         caption: `🎵 *${song.title || "Sinhanada Song"}*
 📦 Size: ${song.size || "Unknown"}
 
