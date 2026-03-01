@@ -39,7 +39,12 @@ module.exports = {
       }
 
       // Fetch the audio buffer to ensure it's not empty and to send as buffer
-      const audioResponse = await axios.get(song.link, { responseType: 'arraybuffer' });
+      const audioResponse = await axios.get(song.link, { 
+        responseType: 'arraybuffer',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+      });
       if (!audioResponse.data || audioResponse.data.byteLength < 100) {
           await react("❌");
           return reply("❌ The audio file is empty or invalid.");
@@ -47,13 +52,18 @@ module.exports = {
 
       await sock.sendMessage(from, {
         audio: Buffer.from(audioResponse.data),
-        mimetype: 'audio/mpeg',
+        mimetype: 'audio/mp4',
         ptt: false,
-        fileName: song.title || "Sinhanada.mp3",
-        caption: `🎵 *${song.title || "Sinhanada Song"}*
-📦 Size: ${song.size || "Unknown"}
-
-> INFINITY MD`
+        fileName: song.title ? `${song.title}.mp3` : "Sinhanada.mp3",
+        contextInfo: {
+          externalAdReply: {
+            title: song.title || "Sinhanada Song",
+            body: "INFINITY MD",
+            mediaType: 1,
+            renderLargerThumbnail: true,
+            thumbnailUrl: "https://api.srihub.store/search/sinhanada?q=logo" // Placeholder or song thumb if available
+          }
+        }
       }, { quoted: msg });
 
       await react("✅");

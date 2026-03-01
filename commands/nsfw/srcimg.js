@@ -26,14 +26,14 @@ module.exports = {
       if (!session || Date.now() > session.expiresAt) {
         if (query === PASSWORD) {
           // Correct password, save session for 5 minutes
-          await store.updateSetting('sessions', sessionKey, { 
+          await store.saveSetting('sessions', sessionKey, { 
             authed: true, 
             expiresAt: Date.now() + 5 * 60 * 1000 
           });
           return reply("✅ Password correct! Now use .srcimg <query> to search.");
         } else {
           // No session or wrong password in query
-          await store.updateSetting('sessions', sessionKey, { 
+          await store.saveSetting('sessions', sessionKey, { 
             authed: false, 
             expiresAt: Date.now() + 1 * 60 * 1000 // 1 minute to enter password
           });
