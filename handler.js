@@ -566,25 +566,28 @@ const handleMessage = async (sock, msg) => {
       }
 
       // YouTube Numeric Reply
-      const ytModule = require('./commands/media/yt');
-      if (ytModule._ytReply) {
-        const resolvedYt = ytModule._ytReply.resolveNumberReply(from, sender, body);
-        if (resolvedYt) {
-          // If it's a numeric reply for YT, we handle it as a command
-          body = resolvedYt;
+      try {
+        const ytModule = require('./commands/media/yt');
+        if (ytModule && ytModule._ytReply) {
+          const resolvedYt = ytModule._ytReply.resolveNumberReply(from, sender, body);
+          if (resolvedYt) {
+            body = resolvedYt;
+          }
         }
-      }
+      } catch (e) {}
 
       // Film2 Numeric Reply
-      const film2Module = require('./commands/movies/film2');
-      if (film2Module._filmReply) {
-        const resolvedFilm = film2Module._filmReply.resolveNumberReply(from, sender, body);
-        if (resolvedFilm) {
-          body = resolvedFilm;
+      try {
+        const film2Module = require('./commands/movies/film2');
+        if (film2Module && film2Module._filmReply) {
+          const resolvedFilm = film2Module._filmReply.resolveNumberReply(from, sender, body);
+          if (resolvedFilm) {
+            body = resolvedFilm;
+          }
         }
-      }
+      } catch (e) {}
     } catch (e) {
-      console.error('Number reply error:', e.message);
+      // console.error('Number reply error:', e.message);
     }
 
     // Command Parser

@@ -119,7 +119,7 @@ app.post('/api/session/delete', express.json(), async (req, res) => {
     if (sessionData) {
       const sessionFolder = path.join(__dirname, 'session', sessionData.folder);
       if (fs.existsSync(sessionFolder)) {
-        fs.rmSync(sessionFolder, { recursive: true, force: true });
+        // fs.rmSync(sessionFolder, { recursive: true, force: true });
       }
       delete sessions[sessionId];
       fs.writeFileSync(sessionsDbPath, JSON.stringify(sessions, null, 2));
@@ -257,7 +257,8 @@ app.post('/api/session/add', express.json(), async (req, res) => {
       folder: sessionName, 
       name: botName || 'Infinity MD',
       ownerName: ownerName || config.ownerName[0],
-      ownerNumber: ownerNumber || config.ownerNumber[0]
+      ownerNumber: ownerNumber || config.ownerNumber[0],
+      addedAt: Date.now()
     };
     fs.writeFileSync(sessionsDbPath, JSON.stringify(sessions, null, 2));
 
@@ -336,6 +337,9 @@ const BACKOFF_MAX = 60000;
 // Re-initialize all saved sessions on startup
 async function initAllSessions() {
   try {
+    if (!fs.existsSync(sessionsDbPath)) {
+      fs.writeFileSync(sessionsDbPath, JSON.stringify({}, null, 2));
+    }
     const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
     for (const id in sessions) {
       console.log(`♻️ Auto-reconnecting session: ${id}`);
