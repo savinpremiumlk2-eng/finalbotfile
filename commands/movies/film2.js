@@ -84,10 +84,23 @@ module.exports = {
         }
 
         // Prefer 720p → 1080p → first
-        const picked =
+        let picked =
           links.find(l => l.quality.includes('720')) ||
           links.find(l => l.quality.includes('1080')) ||
           links[0];
+
+        // Fix for google.com placeholder links from API
+        if (picked.url.includes('google.com/server')) {
+          const realLink = links.find(l => !l.url.includes('google.com'));
+          if (realLink) {
+            picked = realLink;
+          } else {
+             sessions.delete(sender);
+             return sock.sendMessage(chatId, {
+               text: `❌ The API provided a placeholder link (${picked.url}). No valid mirrors found.\n\n🎬 *${selected.title || 'Movie'}*`
+             }, { quoted: msg });
+          }
+        }
 
         await sock.sendMessage(chatId, {
           text: `⬇️ Selected Quality: ${picked.quality}\n📦 Checking size...`

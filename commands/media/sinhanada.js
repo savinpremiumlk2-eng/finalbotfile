@@ -38,8 +38,22 @@ module.exports = {
         return reply("❌ Song link missing from API.");
       }
 
+      // If the link is an HTML page, we need to fetch the actual file link
+      let downloadUrl = song.link;
+      if (downloadUrl.includes('sinhanada.net/data/file/') && downloadUrl.endsWith('.html')) {
+        try {
+          const pageRes = await axios.get(downloadUrl, { timeout: 15000 });
+          const match = pageRes.data.match(/href="(https:\/\/sinhanada\.net\/download\/[^"]+)"/);
+          if (match && match[1]) {
+            downloadUrl = match[1];
+          }
+        } catch (e) {
+          console.log("Error fetching sinhanada download page:", e.message);
+        }
+      }
+
       await sock.sendMessage(from, {
-        audio: { url: song.link },
+        audio: { url: downloadUrl },
         mimetype: 'audio/mp4',
         ptt: true,
         caption: `🎵 *${song.title || "Sinhanada Song"}*
