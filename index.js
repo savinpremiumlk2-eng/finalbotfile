@@ -58,9 +58,11 @@ app.get('/signup', (req, res) => res.sendFile(path.join(__dirname, 'views/signup
 
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
-  if (await auth.login(username, password)) {
+  const authResult = await auth.login(username, password);
+  if (authResult) {
     req.session.loggedIn = true;
-    req.session.username = username;
+    req.session.username = authResult.username;
+    req.session.isOwner = authResult.isOwner || false;
     res.json({ success: true });
   } else {
     res.status(401).json({ success: false, message: 'Invalid credentials' });
@@ -81,15 +83,17 @@ app.get('/', isAuthenticated, (req, res) => res.sendFile(path.join(__dirname, 'v
 app.get('/api/sessions', isAuthenticated, async (req, res) => {
   try {
     const sessions = await database.getAllSessions();
+    const isOwner = req.session.isOwner;
     const userSessions = Object.keys(sessions)
-      .filter(id => sessions[id].userId === req.session.username)
+      .filter(id => isOwner || sessions[id].userId === req.session.username)
       .map(id => ({
         id,
         name: sessions[id].name,
         ownerName: sessions[id].ownerName || config.ownerName[0],
         ownerNumber: sessions[id].ownerNumber || config.ownerNumber[0],
         settings: sessions[id].settings || {},
-        status: activeSessions.has(id) ? 'Online' : 'Offline'
+        status: activeSessions.has(id) ? 'Online' : 'Offline',
+        userId: sessions[id].userId // Helpful for owner to see whose bot it is
       }));
     res.json(userSessions);
   } catch (e) {
@@ -103,7 +107,8 @@ app.post('/api/session/update', isAuthenticated, async (req, res) => {
   
   try {
     const sessions = await database.getAllSessions();
-    if (sessions[sessionId] && sessions[sessionId].userId === req.session.username) {
+    const isOwner = req.session.isOwner;
+    if (sessions[sessionId] && (isOwner || sessions[sessionId].userId === req.session.username)) {
       sessions[sessionId].name = botName || sessions[sessionId].name;
       sessions[sessionId].ownerName = ownerName || sessions[sessionId].ownerName;
       sessions[sessionId].ownerNumber = ownerNumber || sessions[sessionId].ownerNumber;
@@ -136,7 +141,8 @@ app.post('/api/session/delete', isAuthenticated, async (req, res) => {
 
   try {
     const sessions = await database.getAllSessions();
-    if (sessions[sessionId] && sessions[sessionId].userId !== req.session.username) {
+    const isOwner = req.session.isOwner;
+    if (sessions[sessionId] && !isOwner && sessions[sessionId].userId !== req.session.username) {
       return res.status(403).send('Forbidden');
     }
     const sessionData = sessions[sessionId];
@@ -166,7 +172,8 @@ app.post('/api/session/restart', isAuthenticated, async (req, res) => {
 
   try {
     const sessions = await database.getAllSessions();
-    if (sessions[sessionId] && sessions[sessionId].userId !== req.session.username) {
+    const isOwner = req.session.isOwner;
+    if (sessions[sessionId] && !isOwner && sessions[sessionId].userId !== req.session.username) {
       return res.status(403).send('Forbidden');
     }
     const sessionData = sessions[sessionId];
@@ -315,11 +322,21 @@ app.post('/api/session/add', isAuthenticated, async (req, res) => {
   }
 });
 
+app.get('/api/user-info', isAuthenticated, (req, res) => {
+  res.json({
+    username: req.session.username,
+    isOwner: req.session.isOwner || false
+  });
+});
+
 app.get('/api/global-settings', isAuthenticated, async (req, res) => {
   res.json(await database.getGlobalSettings());
 });
 
 app.post('/api/global-settings/update', isAuthenticated, async (req, res) => {
+  if (!req.session.isOwner) {
+    return res.status(403).json({ success: false, message: 'Only owner can update global settings' });
+  }
   const settings = req.body;
   await database.updateGlobalSettings(settings);
   

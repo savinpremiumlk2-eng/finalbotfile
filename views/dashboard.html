@@ -57,7 +57,7 @@
             </div>
         </div>
 
-        <div class="session-card">
+        <div class="session-card" id="globalSettingsCard">
             <h3 style="color: var(--neon-pink);">Global Bot Settings</h3>
             <div style="display: flex; flex-wrap: wrap; gap: 20px;" id="globalSettings">
                 <label><input type="checkbox" id="set-maintenance" style="width: auto;"> Maintenance Mode</label>
@@ -84,7 +84,20 @@
     </div>
 
     <script>
+        let currentUser = null;
+
         function loadSessions() {
+            if (!currentUser) {
+                fetch('/api/user-info')
+                    .then(res => res.json())
+                    .then(user => {
+                        currentUser = user;
+                        if (!user.isOwner) {
+                            document.getElementById('globalSettingsCard').style.display = 'none';
+                        }
+                    });
+            }
+
             fetch('/api/global-settings')
                 .then(res => res.json())
                 .then(settings => {
