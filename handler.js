@@ -633,9 +633,6 @@ const handleMessage = async (sock, msg) => {
               reply: (text) => sock.sendMessage(from, { text }, { quoted: msg }).catch(() => {}),
               react: (emoji) => sock.sendMessage(from, { react: { text: emoji, key: msg.key } }).catch(() => {})
             });
-            await sock.sendMessage(from, { react: { text: '✅', key: msg.key } }).catch(() => {});
-          } else {
-             await sock.sendMessage(from, { react: { text: '❌', key: msg.key } }).catch(() => {});
           }
         } catch (error) {
           console.error(`Error executing command ${commandName}:`, error);
