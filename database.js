@@ -16,6 +16,7 @@ let globalSettingsCache = {
   antidelete: false,
   autoStatus: false
 };
+let moderatorsCache = [];
 
 // Initialize Tables and Cache
 db.serialize(() => {
@@ -46,7 +47,11 @@ db.serialize(() => {
     settings TEXT
   )`);
 
-  // Initial cache load
+  db.run(`CREATE TABLE IF NOT EXISTS moderators (
+    userId TEXT PRIMARY KEY
+  )`);
+
+  // Initial global settings cache load
   db.all("SELECT * FROM global_settings", (err, rows) => {
     if (!err && rows) {
       rows.forEach(row => {
@@ -56,6 +61,13 @@ db.serialize(() => {
           globalSettingsCache[row.key] = row.value;
         }
       });
+    }
+  });
+
+  // Initial moderators cache load
+  db.all("SELECT userId FROM moderators", (err, rows) => {
+    if (!err && rows) {
+      moderatorsCache = rows.map(r => r.userId);
     }
   });
 });
@@ -119,6 +131,25 @@ module.exports = {
     return await run("INSERT OR REPLACE INTO group_settings (groupId, settings) VALUES (?, ?)", [groupId, JSON.stringify(updated)]);
   },
 
+  // Moderators System
+  getModerators: async () => {
+    return moderatorsCache;
+  },
+  isModerator: (userId) => {
+    return moderatorsCache.includes(userId);
+  },
+  addModerator: async (userId) => {
+    if (!moderatorsCache.includes(userId)) {
+      moderatorsCache.push(userId);
+      return await run("INSERT OR IGNORE INTO moderators (userId) VALUES (?)", [userId]);
+    }
+    return false;
+  },
+  removeModerator: async (userId) => {
+    moderatorsCache = moderatorsCache.filter(id => id !== userId);
+    return await run("DELETE FROM moderators WHERE userId = ?", [userId]);
+  },
+
   // Sessions
   getAllSessions: async () => {
     const rows = await query("SELECT * FROM sessions");
@@ -143,5 +174,15 @@ module.exports = {
   },
   deleteSession: async (id) => {
     return await run("DELETE FROM sessions WHERE id = ?", [id]);
+  },
+
+  // Deleted Messages (In-memory only for performance, as before)
+  deletedMessagesCache: new Map(),
+  saveDeletedMessage: (id, data) => {
+    module.exports.deletedMessagesCache.set(id, data);
+    setTimeout(() => module.exports.deletedMessagesCache.delete(id), 3600000);
+  },
+  getDeletedMessage: (id) => {
+    return module.exports.deletedMessagesCache.get(id);
   }
 };
