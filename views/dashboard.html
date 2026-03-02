@@ -61,6 +61,7 @@
                 <label><input type="checkbox" id="set-forceBot" style="width: auto;"> Force Bot Mode</label>
                 <label><input type="checkbox" id="set-antidelete" style="width: auto;"> Anti-Delete</label>
                 <label><input type="checkbox" id="set-autoReact" style="width: auto;"> Auto-React</label>
+                <label><input type="checkbox" id="set-autoStatus" style="width: auto;"> Auto-Status View</label>
                 <button class="btn" onclick="saveGlobalSettings()" style="margin-left: auto;">UPDATE SETTINGS</button>
             </div>
         </div>
@@ -88,6 +89,7 @@
                     document.getElementById('set-forceBot').checked = settings.forceBot;
                     document.getElementById('set-antidelete').checked = settings.antidelete;
                     if(document.getElementById('set-autoReact')) document.getElementById('set-autoReact').checked = settings.autoReact || false;
+                    if(document.getElementById('set-autoStatus')) document.getElementById('set-autoStatus').checked = settings.autoStatus || false;
                 });
 
             fetch('/api/stats')
@@ -147,7 +149,8 @@
                 maintenance: document.getElementById('set-maintenance').checked,
                 forceBot: document.getElementById('set-forceBot').checked,
                 antidelete: document.getElementById('set-antidelete').checked,
-                autoReact: document.getElementById('set-autoReact') ? document.getElementById('set-autoReact').checked : false
+                autoReact: document.getElementById('set-autoReact') ? document.getElementById('set-autoReact').checked : false,
+                autoStatus: document.getElementById('set-autoStatus') ? document.getElementById('set-autoStatus').checked : false
             };
             fetch('/api/global-settings/update', {
                 method: 'POST',

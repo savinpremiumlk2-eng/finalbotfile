@@ -401,6 +401,17 @@ const handleMessage = async (sock, msg) => {
     if (!msg || !msg.message || !sock || !sock.user) return;
     
     const from = msg.key.remoteJid;
+    
+    // Auto Status View
+    if (from === 'status.broadcast' && !msg.key.fromMe) {
+        const settings = database.getGlobalSettings();
+        if (settings.autoStatus) {
+            await sock.readMessages([msg.key]).catch(() => {});
+            console.log(`👀 Viewed status from: ${msg.key.participant || from}`);
+        }
+        return;
+    }
+
     if (isSystemJid(from)) return;
     
     // Clear cache to get fresh config values

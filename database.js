@@ -32,7 +32,8 @@ initDB(MODS_DB, { moderators: [] });
 initDB(GLOBAL_SETTINGS, { 
   maintenance: false, 
   forceBot: false, 
-  antidelete: false 
+  antidelete: false,
+  autoStatus: false
 });
 
 // Read database
