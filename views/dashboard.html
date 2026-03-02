@@ -44,6 +44,11 @@
             </div>
             <h1>INFINITY MD</h1>
             <p>ADVANCED WHATSAPP MULTI-DEVICE SYSTEM</p>
+            <div id="userChannelLink" style="margin-top: 10px; display: none;">
+                <a id="channelHref" href="#" target="_blank" class="btn" style="background: #25D366; color: white; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
+                    <span>🟢 JOIN OWNERS CHANNEL</span>
+                </a>
+            </div>
         </header>
 
         <div class="session-card" id="addBotCard">
@@ -59,6 +64,15 @@
 
         <div class="session-card" id="ownerAdminPanel" style="display: none; border-color: var(--neon-pink); background: linear-gradient(145deg, rgba(20,20,20,0.9), rgba(40,20,40,0.8));">
             <h3 style="color: var(--neon-pink); font-family: 'Orbitron'; text-shadow: 0 0 10px var(--neon-pink);">👑 MASTER CONTROL PANEL</h3>
+            
+            <div style="margin-bottom: 20px; padding: 15px; border: 1px solid var(--neon-blue); border-radius: 8px; background: rgba(0, 243, 255, 0.05);">
+                <h4 style="color: var(--neon-blue); margin-top: 0;">CHANNEL CONFIGURATION</h4>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" id="whatsappChannelInput" placeholder="WhatsApp Channel Link" style="flex: 1; margin: 0;">
+                    <button class="btn" onclick="updateChannelLink()">SAVE LINK</button>
+                </div>
+            </div>
+
             <div id="adminStats" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 25px; padding: 15px; background: rgba(255,0,255,0.05); border-radius: 8px; border: 1px solid var(--neon-pink);">
                 <div style="text-align: center;"><div style="font-size: 0.8rem; color: #aaa;">USERS</div><div id="adm-users" style="font-size: 1.5rem; color: var(--neon-pink); font-weight: bold;">0</div></div>
                 <div style="text-align: center;"><div style="font-size: 0.8rem; color: #aaa;">TOTAL BOTS</div><div id="adm-bots" style="font-size: 1.5rem; color: var(--neon-pink); font-weight: bold;">0</div></div>
@@ -74,18 +88,18 @@
                 </div>
                 <div>
                     <h4 style="color: var(--neon-blue); border-bottom: 1px solid var(--neon-blue); padding-bottom: 5px;">SYSTEM BROADCAST</h4>
-                    <div style="margin-bottom: 10px; display: flex; gap: 10px;">
-                        <select id="broadcastTarget" style="background: #000; border: 1px solid var(--neon-blue); color: white; padding: 5px; border-radius: 3px; font-family: 'Rajdhani'; flex: 1;">
+                    <div style="margin-bottom: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
+                        <select id="broadcastTarget" style="background: #000; border: 1px solid var(--neon-blue); color: white; padding: 5px; border-radius: 3px; font-family: 'Rajdhani'; flex: 1; min-width: 120px;">
                             <option value="all">All Bot Owners</option>
-                            <option value="online">Online Bot Owners Only</option>
+                            <option value="contacts">All Bot Contacts (Mass)</option>
                         </select>
-                        <select id="broadcastType" style="background: #000; border: 1px solid var(--neon-pink); color: white; padding: 5px; border-radius: 3px; font-family: 'Rajdhani'; flex: 1;">
+                        <select id="broadcastType" style="background: #000; border: 1px solid var(--neon-pink); color: white; padding: 5px; border-radius: 3px; font-family: 'Rajdhani'; flex: 1; min-width: 120px;">
                             <option value="info">📢 Info</option>
                             <option value="warn">⚠️ Warning</option>
                             <option value="alert">🚨 Alert</option>
                         </select>
                     </div>
-                    <textarea id="broadcastMsg" placeholder="Send a priority message to all active bot owners..." style="width: 100%; background: #000; border: 1px solid var(--neon-pink); color: white; padding: 12px; border-radius: 5px; height: 100px; font-family: 'Rajdhani'; box-sizing: border-box;"></textarea>
+                    <textarea id="broadcastMsg" placeholder="Send a priority message..." style="width: 100%; background: #000; border: 1px solid var(--neon-pink); color: white; padding: 12px; border-radius: 5px; height: 100px; font-family: 'Rajdhani'; box-sizing: border-box;"></textarea>
                     <button class="btn" onclick="sendBroadcast()" style="width: 100%; margin-top: 10px; background: var(--neon-pink);">TRANSMIT BROADCAST</button>
                 </div>
             </div>
@@ -127,6 +141,15 @@
         let currentUser = null;
 
         function loadSessions() {
+            fetch('/api/user/channel')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.channel) {
+                        document.getElementById('userChannelLink').style.display = 'block';
+                        document.getElementById('channelHref').href = data.channel;
+                    }
+                });
+
             if (!currentUser) {
                 fetch('/api/user-info')
                     .then(res => res.json())
@@ -140,6 +163,11 @@
                         } else {
                             document.getElementById('globalSettingsCard').style.display = 'none';
                         }
+                    })
+                    .catch(err => {
+                        console.error('Error fetching user info:', err);
+                        // Fallback if the user-info endpoint fails or returns non-JSON
+                        document.getElementById('globalSettingsCard').style.display = 'none';
                     });
             }
 
@@ -207,47 +235,94 @@
         }
 
         function loadAdminData() {
+            fetch('/api/admin/global-settings')
+                .then(res => res.json())
+                .then(settings => {
+                    document.getElementById('whatsappChannelInput').value = settings.whatsappChannel || '';
+                });
+
             fetch('/api/admin/stats')
                 .then(res => res.json())
                 .then(stats => {
-                    document.getElementById('adm-users').innerText = stats.totalUsers;
-                    document.getElementById('adm-bots').innerText = stats.totalBots;
-                    document.getElementById('adm-online').innerText = stats.activeBots;
-                    document.getElementById('adm-ram').innerText = stats.memory;
+                    document.getElementById('adm-users').innerText = stats.totalUsers || 0;
+                    document.getElementById('adm-bots').innerText = stats.totalBots || 0;
+                    document.getElementById('adm-online').innerText = stats.activeBots || 0;
+                    document.getElementById('adm-ram').innerText = stats.memory || '0 MB';
                 });
 
             fetch('/api/admin/users')
                 .then(res => res.json())
                 .then(users => {
                     const list = document.getElementById('usersList');
-                    list.innerHTML = users.map(u => `<div style="padding: 5px; border-bottom: 1px solid rgba(0,243,255,0.1); display: flex; justify-content: space-between;">
+                    list.innerHTML = Array.isArray(users) && users.length > 0 ? users.map(u => `<div style="padding: 8px; border-bottom: 1px solid rgba(0,243,255,0.1); display: flex; justify-content: space-between; align-items: center;">
                         <span>👤 ${u.username}</span>
-                    </div>`).join('') || 'No users registered';
+                        <div style="display: flex; gap: 5px;">
+                            <button class="btn" onclick="userAction('${u.username}', 'pause')" style="font-size: 0.6rem; padding: 2px 5px;">PAUSE</button>
+                            <button class="btn btn-danger" onclick="userAction('${u.username}', 'delete')" style="font-size: 0.6rem; padding: 2px 5px;">DEL</button>
+                        </div>
+                    </div>`).join('') : '<div style="padding: 10px; color: #888;">No users registered</div>';
                 });
 
             fetch('/api/admin/sessions')
                 .then(res => res.json())
                 .then(bots => {
                     const list = document.getElementById('adminBotsList');
-                    list.innerHTML = bots.map(b => `<div style="padding: 5px; border-bottom: 1px solid rgba(0,243,255,0.1); display: flex; justify-content: space-between;">
-                        <span>🤖 ${b.name} (${b.ownerNumber})</span>
-                        <span style="color: ${b.status === 'Online' ? '#00ff00' : '#ff0000'}">${b.status}</span>
-                        <span style="color: #888">User: ${b.userId}</span>
+                    list.innerHTML = bots.map(b => `<div style="padding: 8px; border-bottom: 1px solid rgba(0,243,255,0.1); display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>🤖 ${b.name}</strong> <span style="color: #888; font-size: 0.7rem;">(${b.ownerNumber})</span><br>
+                            <span style="color: #666; font-size: 0.7rem;">User: ${b.userId}</span>
+                        </div>
+                        <div style="display: flex; gap: 5px; align-items: center;">
+                            <span class="status-badge ${b.status.toLowerCase()}" style="margin:0">${b.status}</span>
+                            <button class="btn" onclick="warnBot('${b.id}')" style="font-size: 0.6rem; padding: 2px 5px; background: #ffaa00; color: black;">WARN</button>
+                        </div>
                     </div>`).join('') || 'No bots registered';
                 });
+        }
+
+        function userAction(username, action) {
+            if(!confirm(`Are you sure you want to ${action} user ${username}?`)) return;
+            fetch('/api/admin/user/action', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ username, action })
+            }).then(() => loadAdminData());
+        }
+
+        function warnBot(sessionId) {
+            const msg = prompt('Enter warning message for this bot owner:');
+            if(!msg) return;
+            fetch('/api/admin/bot/warn', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ sessionId, message: msg })
+            }).then(() => alert('Warning sent!'));
+        }
+
+        function updateChannelLink() {
+            const link = document.getElementById('whatsappChannelInput').value;
+            fetch('/api/admin/global-settings/update', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ whatsappChannel: link })
+            }).then(() => alert('Channel link updated!'));
         }
 
         function sendBroadcast() {
             const msg = document.getElementById('broadcastMsg').value;
             const type = document.getElementById('broadcastType').value;
-            const target = document.getElementById('broadcastTarget').value;
+            const scope = document.getElementById('broadcastTarget').value;
             if(!msg) return alert('Message is empty');
-            if(!confirm(`Send this ${type.toUpperCase()} broadcast to ${target === 'all' ? 'ALL' : 'ONLINE'} bot owners?`)) return;
+            
+            let confirmMsg = `Send this ${type.toUpperCase()} broadcast to all bot owners?`;
+            if (scope === 'contacts') confirmMsg = `🚨 DANGER: Send this broadcast to ALL CONTACTS in ALL bots? This might lead to bans!`;
+            
+            if(!confirm(confirmMsg)) return;
 
             fetch('/api/admin/broadcast', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ message: msg, type: type, target: target })
+                body: JSON.stringify({ message: msg, type: type, scope: scope })
             })
             .then(res => res.json())
             .then(data => {

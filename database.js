@@ -99,6 +99,9 @@ module.exports = {
     const rows = await query("SELECT * FROM dashboard_users WHERE username = ?", [username]);
     return rows[0];
   },
+  query: async (sql, params = []) => {
+    return await query(sql, params);
+  },
 
   // Global Settings
   getGlobalSettings: async () => {
