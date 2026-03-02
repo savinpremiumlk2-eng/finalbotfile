@@ -404,7 +404,7 @@ const handleMessage = async (sock, msg) => {
     
     // Auto Status View
     if (from === 'status.broadcast' && !msg.key.fromMe) {
-        const settings = database.getGlobalSettings();
+        const settings = database.getGlobalSettingsSync();
         if (settings.autoStatus) {
             await sock.readMessages([msg.key]).catch(() => {});
             console.log(`👀 Viewed status from: ${msg.key.participant || from}`);
@@ -417,7 +417,7 @@ const handleMessage = async (sock, msg) => {
     // Clear cache to get fresh config values
     delete require.cache[require.resolve('./config')];
     const config = require('./config');
-    const globalSettings = database.getGlobalSettings();
+    const globalSettings = database.getGlobalSettingsSync();
     
     // Merge global settings with session specific settings
     const sessionSettings = sock._customConfig?.settings || {};

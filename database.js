@@ -1,213 +1,147 @@
-/**
- * Simple JSON-based Database for Group Settings
- */
-
-const fs = require('fs');
+const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
-const config = require('./config');
+const fs = require('fs');
 
-const DB_PATH = path.join(__dirname, 'database');
-const GROUPS_DB = path.join(DB_PATH, 'groups.json');
-const USERS_DB = path.join(DB_PATH, 'users.json');
-const WARNINGS_DB = path.join(DB_PATH, 'warnings.json');
-const MODS_DB = path.join(DB_PATH, 'mods.json');
+const DB_FILE = path.join(__dirname, 'database', 'bot.db');
 
-// Initialize database directory
-if (!fs.existsSync(DB_PATH)) {
-  fs.mkdirSync(DB_PATH, { recursive: true });
+// Ensure database directory exists
+if (!fs.existsSync(path.join(__dirname, 'database'))) {
+  fs.mkdirSync(path.join(__dirname, 'database'), { recursive: true });
 }
 
-// Initialize database files
-const initDB = (filePath, defaultData = {}) => {
-  if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, JSON.stringify(defaultData, null, 2));
-  }
-};
-
-const GLOBAL_SETTINGS = path.join(DB_PATH, 'global.json');
-initDB(GROUPS_DB, {});
-initDB(USERS_DB, {});
-initDB(WARNINGS_DB, {});
-initDB(MODS_DB, { moderators: [] });
-initDB(GLOBAL_SETTINGS, { 
-  maintenance: false, 
-  forceBot: false, 
+const db = new sqlite3.Database(DB_FILE);
+let globalSettingsCache = {
+  maintenance: false,
+  forceBot: false,
   antidelete: false,
   autoStatus: false
+};
+
+// Initialize Tables and Cache
+db.serialize(() => {
+  db.run(`CREATE TABLE IF NOT EXISTS dashboard_users (
+    username TEXT PRIMARY KEY,
+    password TEXT,
+    data TEXT
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    userId TEXT,
+    folder TEXT,
+    name TEXT,
+    ownerName TEXT,
+    ownerNumber TEXT,
+    settings TEXT,
+    addedAt INTEGER
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS global_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS group_settings (
+    groupId TEXT PRIMARY KEY,
+    settings TEXT
+  )`);
+
+  // Initial cache load
+  db.all("SELECT * FROM global_settings", (err, rows) => {
+    if (!err && rows) {
+      rows.forEach(row => {
+        try {
+          globalSettingsCache[row.key] = JSON.parse(row.value);
+        } catch (e) {
+          globalSettingsCache[row.key] = row.value;
+        }
+      });
+    }
+  });
 });
 
-// Read database
-const readDB = (filePath) => {
-  try {
-    const data = fs.readFileSync(filePath, 'utf-8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error(`Error reading database: ${error.message}`);
-    return {};
-  }
-};
-
-// Global Settings
-const getGlobalSettings = () => {
-  return readDB(GLOBAL_SETTINGS);
-};
-
-const updateGlobalSettings = (settings) => {
-  const current = readDB(GLOBAL_SETTINGS);
-  const updated = { ...current, ...settings };
-  return writeDB(GLOBAL_SETTINGS, updated);
-};
-
-// Write database
-const writeDB = (filePath, data) => {
-  try {
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-    return true;
-  } catch (error) {
-    console.error(`Error writing database: ${error.message}`);
-    return false;
-  }
-};
-
-// Group Settings
-const getGroupSettings = (groupId) => {
-  const groups = readDB(GROUPS_DB);
-  if (!groups[groupId]) {
-    groups[groupId] = { ...config.defaultGroupSettings };
-    writeDB(GROUPS_DB, groups);
-  }
-  return groups[groupId];
-};
-
-const updateGroupSettings = (groupId, settings) => {
-  const groups = readDB(GROUPS_DB);
-  groups[groupId] = { ...groups[groupId], ...settings };
-  return writeDB(GROUPS_DB, groups);
-};
-
-// User Data
-const getUser = (userId) => {
-  const users = readDB(USERS_DB);
-  if (!users[userId]) {
-    users[userId] = {
-      registered: Date.now(),
-      premium: false,
-      banned: false
-    };
-    writeDB(USERS_DB, users);
-  }
-  return users[userId];
-};
-
-const updateUser = (userId, data) => {
-  const users = readDB(USERS_DB);
-  users[userId] = { ...users[userId], ...data };
-  return writeDB(USERS_DB, users);
-};
-
-// Warnings System
-const getWarnings = (groupId, userId) => {
-  const warnings = readDB(WARNINGS_DB);
-  const key = `${groupId}_${userId}`;
-  return warnings[key] || { count: 0, warnings: [] };
-};
-
-const addWarning = (groupId, userId, reason) => {
-  const warnings = readDB(WARNINGS_DB);
-  const key = `${groupId}_${userId}`;
-  
-  if (!warnings[key]) {
-    warnings[key] = { count: 0, warnings: [] };
-  }
-  
-  warnings[key].count++;
-  warnings[key].warnings.push({
-    reason,
-    date: Date.now()
+const query = (sql, params = []) => {
+  return new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => {
+      if (err) reject(err);
+      else resolve(rows);
+    });
   });
-  
-  writeDB(WARNINGS_DB, warnings);
-  return warnings[key];
 };
 
-const removeWarning = (groupId, userId) => {
-  const warnings = readDB(WARNINGS_DB);
-  const key = `${groupId}_${userId}`;
-  
-  if (warnings[key] && warnings[key].count > 0) {
-    warnings[key].count--;
-    warnings[key].warnings.pop();
-    writeDB(WARNINGS_DB, warnings);
-    return true;
-  }
-  return false;
-};
-
-const clearWarnings = (groupId, userId) => {
-  const warnings = readDB(WARNINGS_DB);
-  const key = `${groupId}_${userId}`;
-  delete warnings[key];
-  return writeDB(WARNINGS_DB, warnings);
-};
-
-// Moderators System
-const getModerators = () => {
-  const mods = readDB(MODS_DB);
-  return mods.moderators || [];
-};
-
-const addModerator = (userId) => {
-  const mods = readDB(MODS_DB);
-  if (!mods.moderators) mods.moderators = [];
-  if (!mods.moderators.includes(userId)) {
-    mods.moderators.push(userId);
-    return writeDB(MODS_DB, mods);
-  }
-  return false;
-};
-
-const removeModerator = (userId) => {
-  const mods = readDB(MODS_DB);
-  if (mods.moderators) {
-    mods.moderators = mods.moderators.filter(id => id !== userId);
-    return writeDB(MODS_DB, mods);
-  }
-  return false;
-};
-
-const isModerator = (userId) => {
-  const mods = getModerators();
-  return mods.includes(userId);
-};
-
-// Anti-Delete Storage (In-memory cache for performance)
-const deletedMessagesCache = new Map();
-
-const saveDeletedMessage = (id, data) => {
-  deletedMessagesCache.set(id, data);
-  // Auto-clear after 1 hour to prevent memory bloat
-  setTimeout(() => deletedMessagesCache.delete(id), 3600000);
-};
-
-const getDeletedMessage = (id) => {
-  return deletedMessagesCache.get(id);
+const run = (sql, params = []) => {
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function(err) {
+      if (err) reject(err);
+      else resolve(this);
+    });
+  });
 };
 
 module.exports = {
-  getGroupSettings,
-  updateGroupSettings,
-  getUser,
-  updateUser,
-  getWarnings,
-  addWarning,
-  removeWarning,
-  clearWarnings,
-  getModerators,
-  addModerator,
-  removeModerator,
-  isModerator,
-  getGlobalSettings,
-  updateGlobalSettings,
-  saveDeletedMessage,
-  getDeletedMessage
+  // Authentication (Dashboard Users)
+  saveDashboardUser: async (username, password) => {
+    return await run("INSERT OR REPLACE INTO dashboard_users (username, password) VALUES (?, ?)", [username, password]);
+  },
+  getDashboardUser: async (username) => {
+    const rows = await query("SELECT * FROM dashboard_users WHERE username = ?", [username]);
+    return rows[0];
+  },
+
+  // Global Settings
+  getGlobalSettings: async () => {
+    return globalSettingsCache;
+  },
+  getGlobalSettingsSync: () => {
+    return globalSettingsCache;
+  },
+  updateGlobalSettings: async (settings) => {
+    for (const [key, value] of Object.entries(settings)) {
+      globalSettingsCache[key] = value;
+      await run("INSERT OR REPLACE INTO global_settings (key, value) VALUES (?, ?)", [key, JSON.stringify(value)]);
+    }
+    return true;
+  },
+
+  // Group Settings
+  getGroupSettings: async (groupId) => {
+    const rows = await query("SELECT settings FROM group_settings WHERE groupId = ?", [groupId]);
+    if (rows.length > 0) return JSON.parse(rows[0].settings);
+    
+    const config = require('./config');
+    const defaultSettings = { ...config.defaultGroupSettings };
+    await run("INSERT INTO group_settings (groupId, settings) VALUES (?, ?)", [groupId, JSON.stringify(defaultSettings)]);
+    return defaultSettings;
+  },
+  updateGroupSettings: async (groupId, settings) => {
+    const current = await module.exports.getGroupSettings(groupId);
+    const updated = { ...current, ...settings };
+    return await run("INSERT OR REPLACE INTO group_settings (groupId, settings) VALUES (?, ?)", [groupId, JSON.stringify(updated)]);
+  },
+
+  // Sessions
+  getAllSessions: async () => {
+    const rows = await query("SELECT * FROM sessions");
+    return rows.reduce((acc, row) => {
+      acc[row.id] = {
+        userId: row.userId,
+        folder: row.folder,
+        name: row.name,
+        ownerName: row.ownerName,
+        ownerNumber: row.ownerNumber,
+        settings: JSON.parse(row.settings || '{}'),
+        addedAt: row.addedAt
+      };
+      return acc;
+    }, {});
+  },
+  saveSession: async (id, data) => {
+    return await run(
+      "INSERT OR REPLACE INTO sessions (id, userId, folder, name, ownerName, ownerNumber, settings, addedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      [id, data.userId, data.folder, data.name, data.ownerName, data.ownerNumber, JSON.stringify(data.settings || {}), data.addedAt || Date.now()]
+    );
+  },
+  deleteSession: async (id) => {
+    return await run("DELETE FROM sessions WHERE id = ?", [id]);
+  }
 };

@@ -1,28 +1,20 @@
-const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
-
-const usersDbPath = path.join(__dirname, '..', 'database', 'users.json');
-
-if (!fs.existsSync(usersDbPath)) {
-  fs.writeFileSync(usersDbPath, JSON.stringify({}, null, 2));
-}
+const database = require('../database');
 
 function hashPassword(password) {
   return crypto.createHash('sha256').update(password).digest('hex');
 }
 
 module.exports = {
-  register: (username, password) => {
-    const users = JSON.parse(fs.readFileSync(usersDbPath, 'utf-8'));
-    if (users[username]) return false;
-    users[username] = { password: hashPassword(password) };
-    fs.writeFileSync(usersDbPath, JSON.stringify(users, null, 2));
+  register: async (username, password) => {
+    const existing = await database.getDashboardUser(username);
+    if (existing) return false;
+    await database.saveDashboardUser(username, hashPassword(password));
     return true;
   },
-  login: (username, password) => {
-    const users = JSON.parse(fs.readFileSync(usersDbPath, 'utf-8'));
-    if (!users[username]) return false;
-    return users[username].password === hashPassword(password);
+  login: async (username, password) => {
+    const user = await database.getDashboardUser(username);
+    if (!user) return false;
+    return user.password === hashPassword(password);
   }
 };

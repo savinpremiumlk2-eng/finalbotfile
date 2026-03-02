@@ -25,16 +25,6 @@ if (!fs.existsSync(path.join(__dirname, 'session'))) {
   fs.mkdirSync(path.join(__dirname, 'session'), { recursive: true });
 }
 
-// Ensure database directory exists
-if (!fs.existsSync(path.join(__dirname, 'database'))) {
-  fs.mkdirSync(path.join(__dirname, 'database'), { recursive: true });
-}
-
-// Initialize sessions DB
-if (!fs.existsSync(sessionsDbPath)) {
-  fs.writeFileSync(sessionsDbPath, JSON.stringify({}, null, 2));
-}
-
 // ✅ Load config/settings
 require('./config');
 require('./settings');
@@ -66,19 +56,20 @@ const isAuthenticated = (req, res, next) => {
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'views/login.html')));
 app.get('/signup', (req, res) => res.sendFile(path.join(__dirname, 'views/signup.html')));
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
-  if (auth.login(username, password)) {
+  if (await auth.login(username, password)) {
     req.session.loggedIn = true;
+    req.session.username = username;
     res.json({ success: true });
   } else {
     res.status(401).json({ success: false, message: 'Invalid credentials' });
   }
 });
 
-app.post('/api/auth/signup', (req, res) => {
+app.post('/api/auth/signup', async (req, res) => {
   const { username, password } = req.body;
-  if (auth.register(username, password)) {
+  if (await auth.register(username, password)) {
     res.json({ success: true });
   } else {
     res.status(400).json({ success: false, message: 'User already exists' });
@@ -87,9 +78,9 @@ app.post('/api/auth/signup', (req, res) => {
 
 app.get('/', isAuthenticated, (req, res) => res.sendFile(path.join(__dirname, 'views/dashboard.html')));
 
-app.get('/api/sessions', isAuthenticated, (req, res) => {
+app.get('/api/sessions', isAuthenticated, async (req, res) => {
   try {
-    const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
+    const sessions = await database.getAllSessions();
     const userSessions = Object.keys(sessions)
       .filter(id => sessions[id].userId === req.session.username)
       .map(id => ({
@@ -111,7 +102,7 @@ app.post('/api/session/update', isAuthenticated, async (req, res) => {
   if (!sessionId) return res.status(400).send('Missing session ID');
   
   try {
-    const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
+    const sessions = await database.getAllSessions();
     if (sessions[sessionId] && sessions[sessionId].userId === req.session.username) {
       sessions[sessionId].name = botName || sessions[sessionId].name;
       sessions[sessionId].ownerName = ownerName || sessions[sessionId].ownerName;
@@ -129,7 +120,7 @@ app.post('/api/session/update', isAuthenticated, async (req, res) => {
         };
       }
 
-      fs.writeFileSync(sessionsDbPath, JSON.stringify(sessions, null, 2));
+      await database.saveSession(sessionId, sessions[sessionId]);
       res.json({ success: true });
     } else {
       res.status(404).send('Session not found');
@@ -144,7 +135,7 @@ app.post('/api/session/delete', isAuthenticated, async (req, res) => {
   if (!sessionId) return res.status(400).send('Missing session ID');
 
   try {
-    const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
+    const sessions = await database.getAllSessions();
     if (sessions[sessionId] && sessions[sessionId].userId !== req.session.username) {
       return res.status(403).send('Forbidden');
     }
@@ -160,12 +151,7 @@ app.post('/api/session/delete', isAuthenticated, async (req, res) => {
     }
 
     if (sessionData) {
-      const sessionFolder = path.join(__dirname, 'session', sessionData.folder);
-      if (fs.existsSync(sessionFolder)) {
-        // fs.rmSync(sessionFolder, { recursive: true, force: true });
-      }
-      delete sessions[sessionId];
-      fs.writeFileSync(sessionsDbPath, JSON.stringify(sessions, null, 2));
+      await database.deleteSession(sessionId);
     }
 
     res.json({ success: true });
@@ -179,7 +165,7 @@ app.post('/api/session/restart', isAuthenticated, async (req, res) => {
   if (!sessionId) return res.status(400).send('Missing session ID');
 
   try {
-    const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
+    const sessions = await database.getAllSessions();
     if (sessions[sessionId] && sessions[sessionId].userId !== req.session.username) {
       return res.status(403).send('Forbidden');
     }
@@ -271,7 +257,7 @@ async function connectSession(id, sessionData) {
         ? lastDisconnect.error.output?.statusCode
         : lastDisconnect?.error?.output?.statusCode;
       
-      const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
+      const sessions = await database.getAllSessions();
       const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
       const isDeleted = !sessions[id] && id !== config.sessionID;
 
@@ -299,7 +285,7 @@ app.post('/api/session/add', isAuthenticated, async (req, res) => {
   if (!sessionId) return res.status(400).send('Missing session ID');
   
   try {
-    const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
+    const sessions = await database.getAllSessions();
     const sessionName = sessions[sessionId]?.folder || `session_${Date.now()}`;
     const sessionFolder = path.join(__dirname, 'session', sessionName);
     
@@ -311,7 +297,7 @@ app.post('/api/session/add', isAuthenticated, async (req, res) => {
       ownerNumber: ownerNumber || config.ownerNumber[0],
       addedAt: Date.now()
     };
-    fs.writeFileSync(sessionsDbPath, JSON.stringify(sessions, null, 2));
+    await database.saveSession(sessionId, sessions[sessionId]);
 
     if (sessionId.startsWith('KnightBot!')) {
       const zlib = require('zlib');
@@ -329,16 +315,16 @@ app.post('/api/session/add', isAuthenticated, async (req, res) => {
   }
 });
 
-app.get('/api/global-settings', isAuthenticated, (req, res) => {
-  res.json(database.getGlobalSettings());
+app.get('/api/global-settings', isAuthenticated, async (req, res) => {
+  res.json(await database.getGlobalSettings());
 });
 
 app.post('/api/global-settings/update', isAuthenticated, async (req, res) => {
   const settings = req.body;
-  database.updateGlobalSettings(settings);
+  await database.updateGlobalSettings(settings);
   
   // Notify all active sessions
-  const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
+  const sessions = await database.getAllSessions();
   for (const [id, sock] of activeSessions.entries()) {
     let targetNum = '';
     if (id === config.sessionID) {
@@ -388,10 +374,7 @@ const BACKOFF_MAX = 60000;
 // Re-initialize all saved sessions on startup
 async function initAllSessions() {
   try {
-    if (!fs.existsSync(sessionsDbPath)) {
-      fs.writeFileSync(sessionsDbPath, JSON.stringify({}, null, 2));
-    }
-    const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
+    const sessions = await database.getAllSessions();
     for (const id in sessions) {
       console.log(`♻️ Auto-reconnecting session: ${id}`);
       await connectSession(id, sessions[id]);
