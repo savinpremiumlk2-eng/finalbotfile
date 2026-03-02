@@ -90,14 +90,17 @@ app.get('/', isAuthenticated, (req, res) => res.sendFile(path.join(__dirname, 'v
 app.get('/api/sessions', isAuthenticated, (req, res) => {
   try {
     const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
-    res.json(Object.keys(sessions).map(id => ({
-      id,
-      name: sessions[id].name,
-      ownerName: sessions[id].ownerName || config.ownerName[0],
-      ownerNumber: sessions[id].ownerNumber || config.ownerNumber[0],
-      settings: sessions[id].settings || {},
-      status: activeSessions.has(id) ? 'Online' : 'Offline'
-    })));
+    const userSessions = Object.keys(sessions)
+      .filter(id => sessions[id].userId === req.session.username)
+      .map(id => ({
+        id,
+        name: sessions[id].name,
+        ownerName: sessions[id].ownerName || config.ownerName[0],
+        ownerNumber: sessions[id].ownerNumber || config.ownerNumber[0],
+        settings: sessions[id].settings || {},
+        status: activeSessions.has(id) ? 'Online' : 'Offline'
+      }));
+    res.json(userSessions);
   } catch (e) {
     res.json([]);
   }
@@ -109,7 +112,7 @@ app.post('/api/session/update', isAuthenticated, async (req, res) => {
   
   try {
     const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
-    if (sessions[sessionId]) {
+    if (sessions[sessionId] && sessions[sessionId].userId === req.session.username) {
       sessions[sessionId].name = botName || sessions[sessionId].name;
       sessions[sessionId].ownerName = ownerName || sessions[sessionId].ownerName;
       sessions[sessionId].ownerNumber = ownerNumber || sessions[sessionId].ownerNumber;
@@ -142,6 +145,9 @@ app.post('/api/session/delete', isAuthenticated, async (req, res) => {
 
   try {
     const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
+    if (sessions[sessionId] && sessions[sessionId].userId !== req.session.username) {
+      return res.status(403).send('Forbidden');
+    }
     const sessionData = sessions[sessionId];
     
     if (activeSessions.has(sessionId)) {
@@ -174,6 +180,9 @@ app.post('/api/session/restart', isAuthenticated, async (req, res) => {
 
   try {
     const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
+    if (sessions[sessionId] && sessions[sessionId].userId !== req.session.username) {
+      return res.status(403).send('Forbidden');
+    }
     const sessionData = sessions[sessionId];
     if (!sessionData) return res.status(404).send('Session not found');
 
@@ -295,6 +304,7 @@ app.post('/api/session/add', isAuthenticated, async (req, res) => {
     const sessionFolder = path.join(__dirname, 'session', sessionName);
     
     sessions[sessionId] = { 
+      userId: req.session.username,
       folder: sessionName, 
       name: botName || 'Infinity MD',
       ownerName: ownerName || config.ownerName[0],
