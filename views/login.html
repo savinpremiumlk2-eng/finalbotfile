@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infinity MD | Login</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --neon-blue: #00f3ff; --neon-pink: #ff00ff; --dark-bg: #050505; }
+        body { background-color: var(--dark-bg); color: white; font-family: 'Rajdhani', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .login-card { background: rgba(20, 20, 20, 0.8); border: 1px solid var(--neon-blue); padding: 40px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,243,255,0.2); width: 300px; text-align: center; }
+        h2 { font-family: 'Orbitron'; color: var(--neon-blue); margin-bottom: 30px; }
+        input { background: #111; border: 1px solid var(--neon-blue); color: white; padding: 12px; width: 100%; margin-bottom: 20px; border-radius: 5px; box-sizing: border-box; }
+        .btn { background: var(--neon-blue); color: black; border: none; padding: 12px; width: 100%; cursor: pointer; font-family: 'Orbitron'; font-weight: bold; border-radius: 5px; transition: 0.3s; }
+        .btn:hover { background: var(--neon-pink); color: white; box-shadow: 0 0 15px var(--neon-pink); }
+        p { margin-top: 20px; font-size: 0.9rem; }
+        a { color: var(--neon-blue); text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h2>LOGIN</h2>
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <button class="btn" onclick="login()">ENTER SYSTEM</button>
+        <p>New here? <a href="/signup">Create account</a></p>
+    </div>
+    <script>
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+            if (data.success) location.href = '/';
+            else alert(data.message || 'Login failed');
+        }
+    </script>
+</body>
+</html>

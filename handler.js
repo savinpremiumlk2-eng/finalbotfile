@@ -605,7 +605,8 @@ const handleMessage = async (sock, msg) => {
 
     // Command Parser
     const prefixList = [config.prefix, '/', '#', '!', '.'];
-    const usedPrefix = prefixList.find(p => body.startsWith(p));
+    const text = body.toLowerCase();
+    const usedPrefix = prefixList.find(p => text.startsWith(p));
     
     if (usedPrefix) {
       const args = body.slice(usedPrefix.length).trim().split(/ +/);

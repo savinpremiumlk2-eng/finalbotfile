@@ -41,6 +41,8 @@ require('./settings');
 const config = require('./config');
 const handler = require('./handler');
 const database = require('./database');
+const auth = require('./utils/auth');
+const session = require('express-session');
 const { initializeTempSystem } = require('./utils/tempManager');
 const { startCleanup } = require('./utils/cleanup');
 
@@ -48,9 +50,44 @@ const { startCleanup } = require('./utils/cleanup');
 initializeTempSystem();
 startCleanup();
 
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'views/dashboard.html')));
+app.use(express.json());
+app.use(session({
+  secret: 'infinity-md-secret',
+  resave: false,
+  saveUninitialized: true,
+  cookie: { secure: false } // Set to true if using HTTPS
+}));
 
-app.get('/api/sessions', (req, res) => {
+const isAuthenticated = (req, res, next) => {
+  if (req.session.loggedIn) return next();
+  res.redirect('/login');
+};
+
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'views/login.html')));
+app.get('/signup', (req, res) => res.sendFile(path.join(__dirname, 'views/signup.html')));
+
+app.post('/api/auth/login', (req, res) => {
+  const { username, password } = req.body;
+  if (auth.login(username, password)) {
+    req.session.loggedIn = true;
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ success: false, message: 'Invalid credentials' });
+  }
+});
+
+app.post('/api/auth/signup', (req, res) => {
+  const { username, password } = req.body;
+  if (auth.register(username, password)) {
+    res.json({ success: true });
+  } else {
+    res.status(400).json({ success: false, message: 'User already exists' });
+  }
+});
+
+app.get('/', isAuthenticated, (req, res) => res.sendFile(path.join(__dirname, 'views/dashboard.html')));
+
+app.get('/api/sessions', isAuthenticated, (req, res) => {
   try {
     const sessions = JSON.parse(fs.readFileSync(sessionsDbPath, 'utf-8'));
     res.json(Object.keys(sessions).map(id => ({
@@ -66,7 +103,7 @@ app.get('/api/sessions', (req, res) => {
   }
 });
 
-app.post('/api/session/update', express.json(), async (req, res) => {
+app.post('/api/session/update', isAuthenticated, async (req, res) => {
   const { sessionId, botName, ownerName, ownerNumber, settings } = req.body;
   if (!sessionId) return res.status(400).send('Missing session ID');
   
@@ -99,7 +136,7 @@ app.post('/api/session/update', express.json(), async (req, res) => {
   }
 });
 
-app.post('/api/session/delete', express.json(), async (req, res) => {
+app.post('/api/session/delete', isAuthenticated, async (req, res) => {
   const { sessionId } = req.body;
   if (!sessionId) return res.status(400).send('Missing session ID');
 
@@ -131,7 +168,7 @@ app.post('/api/session/delete', express.json(), async (req, res) => {
   }
 });
 
-app.post('/api/session/restart', express.json(), async (req, res) => {
+app.post('/api/session/restart', isAuthenticated, async (req, res) => {
   const { sessionId } = req.body;
   if (!sessionId) return res.status(400).send('Missing session ID');
 
@@ -248,7 +285,7 @@ async function connectSession(id, sessionData) {
   });
 }
 
-app.post('/api/session/add', express.json(), async (req, res) => {
+app.post('/api/session/add', isAuthenticated, async (req, res) => {
   const { sessionId, botName, ownerName, ownerNumber } = req.body;
   if (!sessionId) return res.status(400).send('Missing session ID');
   
@@ -282,11 +319,11 @@ app.post('/api/session/add', express.json(), async (req, res) => {
   }
 });
 
-app.get('/api/global-settings', (req, res) => {
+app.get('/api/global-settings', isAuthenticated, (req, res) => {
   res.json(database.getGlobalSettings());
 });
 
-app.post('/api/global-settings/update', express.json(), async (req, res) => {
+app.post('/api/global-settings/update', isAuthenticated, async (req, res) => {
   const settings = req.body;
   database.updateGlobalSettings(settings);
   
@@ -317,7 +354,7 @@ app.post('/api/global-settings/update', express.json(), async (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/api/stats', (req, res) => {
+app.get('/api/stats', isAuthenticated, (req, res) => {
   const uptime = process.uptime();
   const h = Math.floor(uptime / 3600);
   const m = Math.floor((uptime % 3600) / 60);
