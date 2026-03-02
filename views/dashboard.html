@@ -46,7 +46,7 @@
             <p>ADVANCED WHATSAPP MULTI-DEVICE SYSTEM</p>
         </header>
 
-        <div class="session-card">
+        <div class="session-card" id="addBotCard">
             <h3>Add New Bot</h3>
             <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
                 <input type="text" id="botName" placeholder="Bot Name">
@@ -54,6 +54,46 @@
                 <input type="text" id="ownerNumber" placeholder="Owner Number (94...)">
                 <input type="text" id="sessionId" placeholder="Session ID (KnightBot!...)">
                 <button class="btn" onclick="addSession()">DEPLOY BOT</button>
+            </div>
+        </div>
+
+        <div class="session-card" id="ownerAdminPanel" style="display: none; border-color: var(--neon-pink); background: linear-gradient(145deg, rgba(20,20,20,0.9), rgba(40,20,40,0.8));">
+            <h3 style="color: var(--neon-pink); font-family: 'Orbitron'; text-shadow: 0 0 10px var(--neon-pink);">👑 MASTER CONTROL PANEL</h3>
+            <div id="adminStats" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 25px; padding: 15px; background: rgba(255,0,255,0.05); border-radius: 8px; border: 1px solid var(--neon-pink);">
+                <div style="text-align: center;"><div style="font-size: 0.8rem; color: #aaa;">USERS</div><div id="adm-users" style="font-size: 1.5rem; color: var(--neon-pink); font-weight: bold;">0</div></div>
+                <div style="text-align: center;"><div style="font-size: 0.8rem; color: #aaa;">TOTAL BOTS</div><div id="adm-bots" style="font-size: 1.5rem; color: var(--neon-pink); font-weight: bold;">0</div></div>
+                <div style="text-align: center;"><div style="font-size: 0.8rem; color: #aaa;">ONLINE</div><div id="adm-online" style="font-size: 1.5rem; color: #00ff00; font-weight: bold;">0</div></div>
+                <div style="text-align: center;"><div style="font-size: 0.8rem; color: #aaa;">RAM</div><div id="adm-ram" style="font-size: 1.2rem; color: var(--neon-blue);">0</div></div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div>
+                    <h4 style="color: var(--neon-blue); border-bottom: 1px solid var(--neon-blue); padding-bottom: 5px;">REGISTERED USERS</h4>
+                    <div id="usersList" style="max-height: 250px; overflow-y: auto; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; border: 1px solid rgba(0,243,255,0.2);">
+                        Loading users...
+                    </div>
+                </div>
+                <div>
+                    <h4 style="color: var(--neon-blue); border-bottom: 1px solid var(--neon-blue); padding-bottom: 5px;">SYSTEM BROADCAST</h4>
+                    <div style="margin-bottom: 10px; display: flex; gap: 10px;">
+                        <select id="broadcastTarget" style="background: #000; border: 1px solid var(--neon-blue); color: white; padding: 5px; border-radius: 3px; font-family: 'Rajdhani'; flex: 1;">
+                            <option value="all">All Bot Owners</option>
+                            <option value="online">Online Bot Owners Only</option>
+                        </select>
+                        <select id="broadcastType" style="background: #000; border: 1px solid var(--neon-pink); color: white; padding: 5px; border-radius: 3px; font-family: 'Rajdhani'; flex: 1;">
+                            <option value="info">📢 Info</option>
+                            <option value="warn">⚠️ Warning</option>
+                            <option value="alert">🚨 Alert</option>
+                        </select>
+                    </div>
+                    <textarea id="broadcastMsg" placeholder="Send a priority message to all active bot owners..." style="width: 100%; background: #000; border: 1px solid var(--neon-pink); color: white; padding: 12px; border-radius: 5px; height: 100px; font-family: 'Rajdhani'; box-sizing: border-box;"></textarea>
+                    <button class="btn" onclick="sendBroadcast()" style="width: 100%; margin-top: 10px; background: var(--neon-pink);">TRANSMIT BROADCAST</button>
+                </div>
+            </div>
+            <div style="margin-top: 25px;">
+                <h4 style="color: var(--neon-blue); border-bottom: 1px solid var(--neon-blue); padding-bottom: 5px;">NETWORK BOT REGISTRY</h4>
+                <div id="adminBotsList" style="max-height: 300px; overflow-y: auto; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 5px; font-size: 0.85rem; border: 1px solid rgba(0,243,255,0.2);">
+                    Loading bot network...
+                </div>
             </div>
         </div>
 
@@ -92,7 +132,12 @@
                     .then(res => res.json())
                     .then(user => {
                         currentUser = user;
-                        if (!user.isOwner) {
+                        if (user.isOwner) {
+                            document.getElementById('ownerAdminPanel').style.display = 'block';
+                            document.getElementById('addBotCard').style.border = '2px solid var(--neon-pink)';
+                            document.getElementById('addBotCard').querySelector('h3').innerText = 'Deploy New Bot (Admin Mode)';
+                            loadAdminData();
+                        } else {
                             document.getElementById('globalSettingsCard').style.display = 'none';
                         }
                     });
@@ -131,6 +176,7 @@
                                     <span class="status-badge ${s.status.toLowerCase()}">${s.status}</span>
                                 </div>
                                 <div style="display: flex; gap: 5px;">
+                                    ${currentUser && currentUser.isOwner ? `<span style="font-size: 0.7rem; color: var(--neon-pink); border: 1px solid var(--neon-pink); padding: 2px 5px; border-radius: 3px;">USER: ${s.userId}</span>` : ''}
                                     <button class="btn" onclick="restartSession('${s.id}')">RESTART</button>
                                     <button class="btn" onclick="toggleEdit('${s.id}')">EDIT</button>
                                     <button class="btn btn-danger" onclick="deleteSession('${s.id}')">DELETE</button>
@@ -158,6 +204,56 @@
                         list.appendChild(card);
                     });
                 });
+        }
+
+        function loadAdminData() {
+            fetch('/api/admin/stats')
+                .then(res => res.json())
+                .then(stats => {
+                    document.getElementById('adm-users').innerText = stats.totalUsers;
+                    document.getElementById('adm-bots').innerText = stats.totalBots;
+                    document.getElementById('adm-online').innerText = stats.activeBots;
+                    document.getElementById('adm-ram').innerText = stats.memory;
+                });
+
+            fetch('/api/admin/users')
+                .then(res => res.json())
+                .then(users => {
+                    const list = document.getElementById('usersList');
+                    list.innerHTML = users.map(u => `<div style="padding: 5px; border-bottom: 1px solid rgba(0,243,255,0.1); display: flex; justify-content: space-between;">
+                        <span>👤 ${u.username}</span>
+                    </div>`).join('') || 'No users registered';
+                });
+
+            fetch('/api/admin/sessions')
+                .then(res => res.json())
+                .then(bots => {
+                    const list = document.getElementById('adminBotsList');
+                    list.innerHTML = bots.map(b => `<div style="padding: 5px; border-bottom: 1px solid rgba(0,243,255,0.1); display: flex; justify-content: space-between;">
+                        <span>🤖 ${b.name} (${b.ownerNumber})</span>
+                        <span style="color: ${b.status === 'Online' ? '#00ff00' : '#ff0000'}">${b.status}</span>
+                        <span style="color: #888">User: ${b.userId}</span>
+                    </div>`).join('') || 'No bots registered';
+                });
+        }
+
+        function sendBroadcast() {
+            const msg = document.getElementById('broadcastMsg').value;
+            const type = document.getElementById('broadcastType').value;
+            const target = document.getElementById('broadcastTarget').value;
+            if(!msg) return alert('Message is empty');
+            if(!confirm(`Send this ${type.toUpperCase()} broadcast to ${target === 'all' ? 'ALL' : 'ONLINE'} bot owners?`)) return;
+
+            fetch('/api/admin/broadcast', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ message: msg, type: type, target: target })
+            })
+            .then(res => res.json())
+            .then(data => {
+                alert(`Broadcast transmitted to ${data.sentTo} sessions!`);
+                document.getElementById('broadcastMsg').value = '';
+            });
         }
 
         function saveGlobalSettings() {

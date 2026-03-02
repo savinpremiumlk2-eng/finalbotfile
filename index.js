@@ -367,6 +367,83 @@ app.post('/api/global-settings/update', isAuthenticated, async (req, res) => {
   res.json({ success: true });
 });
 
+app.get('/api/admin/stats', isAuthenticated, async (req, res) => {
+  if (!req.session.isOwner) return res.status(403).send('Forbidden');
+  try {
+    const sessions = await database.getAllSessions();
+    const users = await database.query("SELECT COUNT(*) as count FROM dashboard_users");
+    const activeCount = Array.from(activeSessions.keys()).length;
+    
+    // Additional metrics
+    const botTypes = Object.values(sessions).reduce((acc, s) => {
+      acc[s.name] = (acc[s.name] || 0) + 1;
+      return acc;
+    }, {});
+
+    res.json({
+      totalBots: Object.keys(sessions).length,
+      activeBots: activeCount,
+      totalUsers: users[0].count,
+      memory: (process.memoryUsage().rss / 1024 / 1024).toFixed(2) + ' MB',
+      botTypes
+    });
+  } catch (e) {
+    res.status(500).send(e.message);
+  }
+});
+
+app.get('/api/admin/users', isAuthenticated, async (req, res) => {
+  if (!req.session.isOwner) return res.status(403).send('Forbidden');
+  try {
+    const users = await database.query("SELECT username, data FROM dashboard_users");
+    res.json(users);
+  } catch (e) {
+    res.status(500).send(e.message);
+  }
+});
+
+app.post('/api/admin/broadcast', isAuthenticated, async (req, res) => {
+  if (!req.session.isOwner) return res.status(403).send('Forbidden');
+  const { message, type, target } = req.body;
+  if (!message) return res.status(400).send('Message required');
+
+  const icons = { info: '📢', warn: '⚠️', alert: '🚨' };
+  const icon = icons[type] || '📢';
+  const prefix = type === 'alert' ? '*[URGENT]* ' : '';
+
+  let successCount = 0;
+  const sessions = await database.getAllSessions();
+
+  for (const [id, sock] of activeSessions.entries()) {
+    try {
+      const targetNum = sessions[id]?.ownerNumber || (id === config.sessionID ? config.ownerNumber[0] : null);
+      if (targetNum) {
+        const jid = targetNum.includes('@') ? targetNum : `${targetNum}@s.whatsapp.net`;
+        await sock.sendMessage(jid, { text: `${icon} ${prefix}*SYSTEM BROADCAST*\n\n${message}` });
+        successCount++;
+      }
+    } catch (e) {
+      console.error(`Broadcast failed for session ${id}:`, e.message);
+    }
+  }
+  res.json({ success: true, sentTo: successCount });
+});
+
+app.get('/api/admin/sessions', isAuthenticated, async (req, res) => {
+  if (!req.session.isOwner) return res.status(403).send('Forbidden');
+  try {
+    const sessions = await database.getAllSessions();
+    const result = Object.keys(sessions).map(id => ({
+      id,
+      ...sessions[id],
+      status: activeSessions.has(id) ? 'Online' : 'Offline'
+    }));
+    res.json(result);
+  } catch (e) {
+    res.status(500).send(e.message);
+  }
+});
+
 app.get('/api/stats', isAuthenticated, (req, res) => {
   const uptime = process.uptime();
   const h = Math.floor(uptime / 3600);
