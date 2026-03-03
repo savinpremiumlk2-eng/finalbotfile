@@ -172,8 +172,7 @@ module.exports = {
         '9': `${prefix}moviemenu`,
         '10': `${prefix}generalmenu`,
         '11': `${prefix}autotyping`,
-        '12': `${prefix}autovoice`,
-        '0': `${prefix}mainmenu`
+        '12': `${prefix}autovoice`
       };
       setSession(chatId, sender, numberMap);
 
@@ -200,10 +199,9 @@ module.exports = {
       menuText += `│ 🔟 🧭 ${prefix}generalmenu\n`;
       menuText += `│ 1️⃣1️⃣ ⌨️ ${prefix}autotyping\n`;
       menuText += `│ 1️⃣2️⃣ 🎤 ${prefix}autovoice\n`;
-      menuText += `│ 0️⃣ 📜 ${prefix}mainmenu\n`;
       menuText += `╰────────────────────\n\n`;
 
-      menuText += `💡 *Reply with a number* (1-12 / 0)\n`;
+      menuText += `💡 *Reply with a number* (1-12)\n`;
       menuText += `╭───〔 🌟 CREDITS 〕───\n`;
       menuText += `│ ⚡ *Infinity MD* by Infinity Team\n`;
       menuText += `│ 🧠 Powered by Baileys\n`;
@@ -223,7 +221,7 @@ module.exports = {
               forwardingScore: 1,
               isForwarded: true,
               forwardedNewsletterMessageInfo: {
-                newsletterJid: config.newsletterJid || '120363161513685998@newsletter',
+                newsletterJid: config.newsletterJid || '120363384242634351@newsletter',
                 newsletterName: config.botName || 'INFINITY MD',
                 serverMessageId: -1
               }

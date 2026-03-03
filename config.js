@@ -12,7 +12,7 @@ module.exports = {
   prefix: '.',
   sessionName: 'session',
   sessionID: process.env.SESSION_ID || '',
-  newsletterJid: '120363161513685998@newsletter',
+  newsletterJid: '120363384242634351@newsletter',
 
   // Keep update link empty as requested
   updateZipUrl: '',
