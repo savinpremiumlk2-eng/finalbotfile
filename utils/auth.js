@@ -13,13 +13,10 @@ module.exports = {
     return true;
   },
   login: async (username, password) => {
-    if (username === 'owner123' && password === 'Savi123') {
-      return { username: 'owner123', isOwner: true };
-    }
     const user = await database.getDashboardUser(username);
     if (!user) return false;
     if (user.password === hashPassword(password)) {
-      return { username, isOwner: false };
+      return { username, isOwner: username === 'owner123' };
     }
     return false;
   }
