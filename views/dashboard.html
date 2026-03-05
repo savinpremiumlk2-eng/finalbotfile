@@ -342,12 +342,18 @@ footer{
     <label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="set-antidelete" style="width: auto; margin: 0;"> Anti-Delete</label>
     <label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="set-autoReact" style="width: auto; margin: 0;"> Auto-React</label>
     <label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="set-autoStatus" style="width: auto; margin: 0;"> Auto-Status</label>
+    <label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="set-antiviewonce" style="width: auto; margin: 0;"> Anti-ViewOnce</label>
     <div style="display: flex; align-items: center; gap: 8px;">
       <span style="font-size: 0.9rem;">Global SRC Mode:</span>
       <select id="set-srcMode" style="width: auto; margin: 0; padding: 4px 8px;">
         <option value="private">Private</option>
         <option value="public">Public</option>
+        <option value="disabled">Disabled</option>
       </select>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="font-size: 0.9rem;">Global SRC PIN:</span>
+      <input type="text" id="set-srcPin" placeholder="0000" style="width: 80px; margin: 0; padding: 4px 8px;">
     </div>
     <button class="btn btn-primary" onclick="saveGlobalSettings()" style="margin-left: auto;">Update</button>
   </div>
@@ -403,7 +409,9 @@ function loadDashboard() {
     document.getElementById('set-antidelete').checked = settings.antidelete;
     if(document.getElementById('set-autoReact')) document.getElementById('set-autoReact').checked = settings.autoReact || false;
     if(document.getElementById('set-autoStatus')) document.getElementById('set-autoStatus').checked = settings.autoStatus || false;
+    if(document.getElementById('set-antiviewonce')) document.getElementById('set-antiviewonce').checked = settings.antiviewonce || false;
     if(document.getElementById('set-srcMode')) document.getElementById('set-srcMode').value = settings.srcMode || 'private';
+    if(document.getElementById('set-srcPin')) document.getElementById('set-srcPin').value = settings.srcPin || '0000';
   });
 
   // Channel link
@@ -450,12 +458,18 @@ function renderSessions() {
             <label style="display: block; margin-bottom: 8px; font-size: 0.85rem;"><input type="checkbox" id="edit-antidelete-${s.id}" ${s.settings?.antidelete ? 'checked' : ''}> Anti-Delete</label>
             <label style="display: block; margin-bottom: 8px; font-size: 0.85rem;"><input type="checkbox" id="edit-autoreact-${s.id}" ${s.settings?.autoreact ? 'checked' : ''}> Auto-React</label>
             <label style="display: block; margin-bottom: 8px; font-size: 0.85rem;"><input type="checkbox" id="edit-anticall-${s.id}" ${s.settings?.anticall ? 'checked' : ''}> Anti-Call</label>
+            <label style="display: block; margin-bottom: 8px; font-size: 0.85rem;"><input type="checkbox" id="edit-antiviewonce-${s.id}" ${s.settings?.antiviewonce ? 'checked' : ''}> Anti-ViewOnce</label>
             <div style="margin-bottom: 8px;">
               <span style="font-size: 0.85rem; color: var(--muted);">SRC Mode:</span>
               <select id="edit-srcmode-${s.id}" style="padding: 4px; margin-top: 4px;">
                 <option value="private" ${s.settings?.srcMode === 'private' ? 'selected' : ''}>Private (PIN Required)</option>
                 <option value="public" ${s.settings?.srcMode === 'public' ? 'selected' : ''}>Public (No PIN)</option>
+                <option value="disabled" ${s.settings?.srcMode === 'disabled' ? 'selected' : ''}>Disabled</option>
               </select>
+            </div>
+            <div style="margin-bottom: 8px;">
+              <span style="font-size: 0.85rem; color: var(--muted);">SRC PIN:</span>
+              <input type="text" id="edit-srcpin-${s.id}" value="${s.settings?.srcPin || ''}" placeholder="4-digit PIN" style="padding: 4px; margin-top: 4px; margin-bottom: 0;">
             </div>
           </div>
           <button class="btn btn-primary" style="width: 100%;" onclick="updateSession('${s.id}')">Save Changes</button>
@@ -557,7 +571,9 @@ function updateSession(id) {
     antidelete: document.getElementById(`edit-antidelete-${id}`).checked,
     autoreact: document.getElementById(`edit-autoreact-${id}`).checked,
     anticall: document.getElementById(`edit-anticall-${id}`).checked,
-    srcMode: document.getElementById(`edit-srcmode-${id}`).value
+    antiviewonce: document.getElementById(`edit-antiviewonce-${id}`).checked,
+    srcMode: document.getElementById(`edit-srcmode-${id}`).value,
+    srcPin: document.getElementById(`edit-srcpin-${id}`).value
   };
   fetch('/api/session/update', {
     method: 'POST',
@@ -582,7 +598,9 @@ function saveGlobalSettings() {
     antidelete: document.getElementById('set-antidelete').checked,
     autoReact: document.getElementById('set-autoReact').checked,
     autoStatus: document.getElementById('set-autoStatus').checked,
-    srcMode: document.getElementById('set-srcMode').value
+    antiviewonce: document.getElementById('set-antiviewonce').checked,
+    srcMode: document.getElementById('set-srcMode').value,
+    srcPin: document.getElementById('set-srcPin').value
   };
   fetch('/api/global-settings/update', {
     method: 'POST',

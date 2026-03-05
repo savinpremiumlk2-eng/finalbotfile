@@ -23,7 +23,11 @@ module.exports = {
       const database = require('../../database');
       const globalSettings = await database.getGlobalSettings();
       const sessionSettings = sock._customConfig?.settings || {};
-      const isPublic = sessionSettings.srcMode === 'public' || (globalSettings.srcMode === 'public' && !sessionSettings.srcMode);
+      const mode = sessionSettings.srcMode || globalSettings.srcMode || 'private';
+      
+      if (mode === 'disabled') return reply("❌ SRC commands are currently disabled.");
+      
+      const isPublic = mode === 'public';
 
       const sessionKey = `srcimg_pass_${from}_${sender}`;
       const session = await store.getSetting('sessions', sessionKey);

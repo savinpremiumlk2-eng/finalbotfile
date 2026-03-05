@@ -488,20 +488,17 @@ const handleMessage = async (sock, msg) => {
     // Anti-Delete System
     const isPrivate = !isGroup;
     const adEnabled = effectiveSettings.antidelete;
-    const adPrivate = globalSettings.antideletePrivate ?? true;
-    const adGroup = globalSettings.antideleteGroup ?? true;
+    const adPrivate = true; // Always allow in private if enabled
+    const adGroup = true;   // Always allow in groups if enabled
 
     if (adEnabled && msg.message?.protocolMessage?.type === 0) {
        const key = msg.message.protocolMessage.key;
        const deletedMsg = await database.getDeletedMessage(key.id);
        if (deletedMsg) {
-         const shouldNotify = (isPrivate && adPrivate) || (isGroup && adGroup);
-         if (shouldNotify) {
            const targetNum = sock._customConfig?.ownerNumber || config.ownerNumber[0];
            const jid = targetNum.includes('@') ? targetNum : `${targetNum}@s.whatsapp.net`;
            const note = `🛡️ *Anti-Delete Detected*\n\n*From:* @${deletedMsg.sender.split('@')[0]}\n*Chat:* ${isGroup ? 'Group' : 'Private'}\n*Type:* ${deletedMsg.type}\n\n*Content:* ${deletedMsg.body || 'Media/Unsupported'}`;
-           await sock.sendMessage(jid, { text: note, mentions: [deletedMsg.sender] }).catch(() => {});
-         }
+           await sock.sendMessage(from, { text: note, mentions: [deletedMsg.sender] }).catch(() => {});
        }
     }
     
@@ -521,6 +518,21 @@ const handleMessage = async (sock, msg) => {
        });
     }
     
+    // Anti-ViewOnce System
+    if (effectiveSettings.antiviewonce && content) {
+      const type = Object.keys(content)[0];
+      if (type === 'viewOnceMessageV2' || type === 'viewOnceMessage') {
+        const viewOnce = content[type].message;
+        const msgType = Object.keys(viewOnce)[0];
+        const media = viewOnce[msgType];
+        
+        await sock.sendMessage(from, {
+          [msgType.replace('Message', '')]: media,
+          caption: `🛡️ *Anti-ViewOnce Detected*\n\n${media.caption || ''}`
+        }, { quoted: msg }).catch(() => {});
+      }
+    }
+
     if (!content || actualMessageTypes.length === 0) return;
     
     let body = '';
