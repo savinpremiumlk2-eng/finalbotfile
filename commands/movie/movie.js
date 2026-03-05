@@ -127,7 +127,7 @@ const cinedl = async (url) => {
 
 module.exports = { 
     name: 'movie',
-    category: 'media',
+    category: 'movie',
     desc: 'Download movies from Cinesubz',
     async execute(sock, msg, args) {
         if (!args[0]) return msg.reply('Please provide a Cinesubz URL');
