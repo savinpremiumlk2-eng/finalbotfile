@@ -24,10 +24,15 @@ module.exports = {
         return reply("❌ SRC commands are currently disabled by the owner.");
       }
 
+      const database = require('../../database');
+      const globalSettings = await database.getGlobalSettings();
+      const sessionSettings = sock._customConfig?.settings || {};
+      const isPublic = sessionSettings.srcMode === 'public' || (globalSettings.srcMode === 'public' && !sessionSettings.srcMode);
+
       const sessionKey = `srcimg_pass_${from}_${sender}`;
       const session = await store.getSetting('sessions', sessionKey);
 
-      if (!session || !session.authed) {
+      if (!isPublic && (!session || !session.authed)) {
         return reply("🔑 Login first using .srcimg 0000");
       }
 

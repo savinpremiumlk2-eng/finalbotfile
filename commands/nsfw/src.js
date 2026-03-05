@@ -21,9 +21,20 @@ module.exports = {
       return reply("❌ Please provide a 4-digit PIN.\nExample: `.src 0000` or `.srcimg 0000` ");
     }
 
-    const globalSettings = database.getGlobalSettingsSync();
+    const globalSettings = await database.getGlobalSettings();
     const sessionSettings = sock._customConfig?.settings || {};
     const srcPin = sessionSettings.srcPin || globalSettings.srcPin || "0000";
+
+    const isPublic = sessionSettings.srcMode === 'public' || (globalSettings.srcMode === 'public' && !sessionSettings.srcMode);
+
+    if (isPublic) {
+      const sessionKey = `srcimg_pass_${from}_${sender}`;
+      await store.saveSetting('sessions', sessionKey, {
+        authed: true,
+        timestamp: Date.now()
+      });
+      return reply("✅ *Access Granted (Public Mode)!*\n\nYou can now use `.src-s` and `.src-dl` commands.");
+    }
 
     if (pinInput === srcPin) {
       const sessionKey = `srcimg_pass_${from}_${sender}`;
