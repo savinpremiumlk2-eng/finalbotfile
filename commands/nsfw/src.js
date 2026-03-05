@@ -29,18 +29,16 @@ module.exports = {
       return reply("❌ SRC commands are currently disabled.");
     }
 
-    const srcPin = sessionSettings.srcPin || globalSettings.srcPin || "0000";
-
-    const isPublic = mode === 'public';
-
-    if (isPublic) {
-      const sessionKey = `srcimg_pass_${from}_${sender}`;
-      await store.saveSetting('sessions', sessionKey, {
-        authed: true,
-        timestamp: Date.now()
-      });
-      return reply("✅ *Access Granted (Public Mode)!*\n\nYou can now use `.src-s` and `.src-dl` commands.");
+    if (mode === 'private_no_pin' || mode === 'public_no_pin') {
+       const sessionKey = `srcimg_pass_${from}_${sender}`;
+       await store.saveSetting('sessions', sessionKey, {
+         authed: true,
+         timestamp: Date.now()
+       });
+       return reply(`✅ *Access Granted (${mode.replace(/_/g, ' ')})!*\n\nYou can now use \`.src-s\` and \`.src-dl\` commands.`);
     }
+
+    const srcPin = sessionSettings.srcPin || globalSettings.srcPin || "0000";
 
     if (pinInput === srcPin) {
       const sessionKey = `srcimg_pass_${from}_${sender}`;

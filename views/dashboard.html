@@ -346,8 +346,10 @@ footer{
     <div style="display: flex; align-items: center; gap: 8px;">
       <span style="font-size: 0.9rem;">Global SRC Mode:</span>
       <select id="set-srcMode" style="width: auto; margin: 0; padding: 4px 8px;">
-        <option value="private">Private</option>
-        <option value="public">Public</option>
+        <option value="private">Private (PIN Required)</option>
+        <option value="private_no_pin">Private (No PIN)</option>
+        <option value="public">Public (PIN Required)</option>
+        <option value="public_no_pin">Public (No PIN)</option>
         <option value="disabled">Disabled</option>
       </select>
     </div>
@@ -463,7 +465,9 @@ function renderSessions() {
               <span style="font-size: 0.85rem; color: var(--muted);">SRC Mode:</span>
               <select id="edit-srcmode-${s.id}" style="padding: 4px; margin-top: 4px;">
                 <option value="private" ${s.settings?.srcMode === 'private' ? 'selected' : ''}>Private (PIN Required)</option>
-                <option value="public" ${s.settings?.srcMode === 'public' ? 'selected' : ''}>Public (No PIN)</option>
+                <option value="private_no_pin" ${s.settings?.srcMode === 'private_no_pin' ? 'selected' : ''}>Private (No PIN)</option>
+                <option value="public" ${s.settings?.srcMode === 'public' ? 'selected' : ''}>Public (PIN Required)</option>
+                <option value="public_no_pin" ${s.settings?.srcMode === 'public_no_pin' ? 'selected' : ''}>Public (No PIN)</option>
                 <option value="disabled" ${s.settings?.srcMode === 'disabled' ? 'selected' : ''}>Disabled</option>
               </select>
             </div>

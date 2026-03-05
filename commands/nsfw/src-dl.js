@@ -31,13 +31,17 @@ module.exports = {
       
       if (mode === 'disabled') return reply("❌ SRC commands are currently disabled.");
       
-      const isPublic = mode === 'public';
+      const isPublic = mode === 'public' || mode === 'public_no_pin';
+      const noPin = mode === 'private_no_pin' || mode === 'public_no_pin';
 
       const sessionKey = `srcimg_pass_${from}_${sender}`;
       const session = await store.getSetting('sessions', sessionKey);
 
-      if (!isPublic && (!session || !session.authed)) {
-        return reply("🔑 Login first using .srcimg 0000");
+      if (!noPin && (!session || !session.authed)) {
+        if (isPublic) {
+            return reply("🔑 This feature is Public but requires a PIN unlock once. Use .src 0000");
+        }
+        return reply("🔑 Private feature. Login first using .src 0000");
       }
 
       const videoUrl = args.join(" ").trim();
