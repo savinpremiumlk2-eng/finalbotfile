@@ -16,11 +16,17 @@ module.exports = {
   async execute(sock, msg, args, extra) {
     const { from, sender, reply, isOwner } = extra;
     
+    const pin = args[0];
+    const CORRECT_PIN = "0000";
+
+    if (!pin) return reply("🔑 Please provide a PIN. Example: .src 0000");
+    if (pin !== CORRECT_PIN) return reply("❌ Invalid PIN. Access Denied.");
+
     const sessionKey = `srcimg_pass_${from}_${sender}`;
     await store.saveSetting('sessions', sessionKey, {
       authed: true,
       timestamp: Date.now()
     });
-    return reply("✅ *Access Granted (Public Mode)!*\n\nYou can now use `.src-s` and `.src-dl` commands.");
+    return reply("✅ *Access Granted!*\n\nYou can now use `.src-s` and `.src-dl` commands.");
   }
 };

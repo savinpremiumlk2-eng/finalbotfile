@@ -56,7 +56,7 @@ module.exports = {
       const songResult = data.result[0]; // first result
       const songPage = songResult.link;
 
-      // DOWNLOAD API
+      // Download URL fetching
       const downloadUrl = `https://api.srihub.store/download/sinhanada?url=${encodeURIComponent(songPage)}&apikey=${API_KEY}`;
       const { data: dlData } = await axios.get(downloadUrl, { timeout: 30000 });
 
@@ -66,15 +66,21 @@ module.exports = {
       }
 
       const song = dlData.result;
+      const download_url = song.download_url || song.url || song.link;
+
+      if (!download_url) {
+        await react("❌");
+        return reply("❌ Could not find a valid download link.");
+      }
 
       await sock.sendMessage(from, {
-        audio: { url: song.download_url },
+        audio: { url: download_url },
         mimetype: 'audio/mpeg',
         ptt: false,
-        caption: `🎵 *${song.title}*
-👤 Artist: ${song.artist}
-💾 Size: ${song.size}
-📅 Uploaded: ${song.uploaded_on}
+        caption: `🎵 *${song.title || song.name || 'Unknown'}*
+👤 Artist: ${song.artist || 'Unknown'}
+💾 Size: ${song.size || 'Unknown'}
+📅 Uploaded: ${song.uploaded_on || 'Unknown'}
 
 > INFINITY MD`
       }, { quoted: msg });
