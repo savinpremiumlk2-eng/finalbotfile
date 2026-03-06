@@ -34,8 +34,15 @@ db.serialize(() => {
     ownerName TEXT,
     ownerNumber TEXT,
     settings TEXT,
+    creds TEXT,
     addedAt INTEGER
-  )`);
+  )`, (err) => {
+    if (!err) {
+      db.run("ALTER TABLE sessions ADD COLUMN creds TEXT", (alterErr) => {
+        // Ignore "duplicate column name" error
+      });
+    }
+  });
 
   db.run(`CREATE TABLE IF NOT EXISTS global_settings (
     key TEXT PRIMARY KEY,
@@ -182,6 +189,7 @@ module.exports = {
         ownerName: row.ownerName,
         ownerNumber: row.ownerNumber,
         settings: JSON.parse(row.settings || '{}'),
+        creds: row.creds,
         addedAt: row.addedAt
       };
       return acc;
@@ -189,9 +197,12 @@ module.exports = {
   },
   saveSession: async (id, data) => {
     return await run(
-      "INSERT OR REPLACE INTO sessions (id, userId, folder, name, ownerName, ownerNumber, settings, addedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      [id, data.userId, data.folder, data.name, data.ownerName, data.ownerNumber, JSON.stringify(data.settings || {}), data.addedAt || Date.now()]
+      "INSERT OR REPLACE INTO sessions (id, userId, folder, name, ownerName, ownerNumber, settings, creds, addedAt) VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT creds FROM sessions WHERE id = ?), ?)",
+      [id, data.userId, data.folder, data.name, data.ownerName, data.ownerNumber, JSON.stringify(data.settings || {}), id, data.addedAt || Date.now()]
     );
+  },
+  saveSessionCreds: async (id, creds) => {
+    return await run("UPDATE sessions SET creds = ? WHERE id = ?", [creds, id]);
   },
   deleteSession: async (id) => {
     return await run("DELETE FROM sessions WHERE id = ?", [id]);

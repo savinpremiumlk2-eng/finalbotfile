@@ -122,6 +122,22 @@ app.post('/api/session/update', isAuthenticated, async (req, res) => {
           ownerNumber: sessions[sessionId].ownerNumber,
           settings: sessions[sessionId].settings
         };
+        
+        // Notify owner via WhatsApp
+        const targetNum = sessions[sessionId].ownerNumber;
+        if (targetNum) {
+          const jid = targetNum.includes('@') ? targetNum : `${targetNum}@s.whatsapp.net`;
+          const msg = `✅ *Bot Settings Updated*\n\n` +
+                      `• Bot Name: ${sessions[sessionId].name}\n` +
+                      `• Owner: ${sessions[sessionId].ownerName}\n` +
+                      `• Settings: ${JSON.stringify(sessions[sessionId].settings)}\n\n` +
+                      `_Changes applied successfully._`;
+          try {
+            await sock.sendMessage(jid, { text: msg });
+          } catch (e) {
+            console.error(`Failed to notify owner for session ${sessionId}:`, e.message);
+          }
+        }
       }
 
       await database.saveSession(sessionId, sessions[sessionId]);
@@ -200,6 +216,11 @@ async function connectSession(id, sessionData) {
     fs.mkdirSync(sessionFolder, { recursive: true });
   }
 
+  // Restore creds from DB if they don't exist in folder
+  if (!fs.existsSync(path.join(sessionFolder, 'creds.json')) && sessionData.creds) {
+    fs.writeFileSync(path.join(sessionFolder, 'creds.json'), sessionData.creds);
+  }
+
   // Handle KnightBot! session ID decoding if needed
   if (id && id.startsWith('KnightBot!')) {
     try {
@@ -234,7 +255,12 @@ async function connectSession(id, sessionData) {
      settings: sessionData.settings || {}
   };
 
-  newSock.ev.on('creds.update', saveCreds);
+  newSock.ev.on('creds.update', async () => {
+    await saveCreds();
+    // After saving creds to disk, we could potentially back them up to DB
+    const credsData = fs.readFileSync(path.join(sessionFolder, 'creds.json'), 'utf8');
+    await database.saveSessionCreds(id, credsData);
+  });
   
   // Anti-Call Listener
   newSock.ev.on('call', async (callUpdate) => {
