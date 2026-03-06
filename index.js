@@ -343,17 +343,25 @@ app.post('/api/global-settings/update', isAuthenticated, async (req, res) => {
   const sessions = await database.getAllSessions();
   for (const [id, sock] of activeSessions.entries()) {
     let targetNum = '';
-    if (id === config.sessionID) {
-      targetNum = config.ownerNumber[0];
+    // Use custom config owner number if available, else fallback to session data or global config
+    if (sock._customConfig?.ownerNumber) {
+      const owners = Array.isArray(sock._customConfig.ownerNumber) ? sock._customConfig.ownerNumber : [sock._customConfig.ownerNumber];
+      targetNum = owners[0];
     } else if (sessions[id]) {
       targetNum = sessions[id].ownerNumber;
+    } else if (id === config.sessionID) {
+      targetNum = config.ownerNumber[0];
     }
     
     if (targetNum) {
       const jid = targetNum.includes('@') ? targetNum : `${targetNum}@s.whatsapp.net`;
       const msg = `⚙️ *Global Settings Updated*\n\n` + 
-                  Object.entries(settings).map(([k, v]) => `• ${k}: ${v ? 'ON' : 'OFF'}`).join('\n') +
-                  `\n\n_Changes applied instantly._`;
+                  Object.entries(settings).map(([k, v]) => {
+                    let displayVal = v;
+                    if (typeof v === 'boolean') displayVal = v ? 'ON' : 'OFF';
+                    return `• ${k}: ${displayVal}`;
+                  }).join('\n') +
+                  `\n\n_Changes applied instantly to all bots._`;
       try { 
         await sock.sendMessage(jid, { text: msg });
         console.log(`Sent update message to owner ${targetNum} for session ${id}`);

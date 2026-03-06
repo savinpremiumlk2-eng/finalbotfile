@@ -61,8 +61,26 @@ db.serialize(() => {
           globalSettingsCache[row.key] = row.value;
         }
       });
+      console.log("✅ Global settings loaded into cache");
     }
   });
+
+  // Load existing sessions into DB if sessions.json exists (migration/sync)
+  const sessionsJsonPath = path.join(__dirname, 'database', 'sessions.json');
+  if (fs.existsSync(sessionsJsonPath)) {
+    try {
+      const sessions = JSON.parse(fs.readFileSync(sessionsJsonPath, 'utf8'));
+      Object.entries(sessions).forEach(([id, data]) => {
+        db.run(
+          "INSERT OR IGNORE INTO sessions (id, userId, folder, name, ownerName, ownerNumber, settings, addedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+          [id, data.userId, data.folder, data.name, data.ownerName, data.ownerNumber, JSON.stringify(data.settings || {}), data.addedAt || Date.now()]
+        );
+      });
+      console.log("✅ Sessions synced from JSON to SQLite");
+    } catch (e) {
+      console.error("❌ Error syncing sessions:", e.message);
+    }
+  }
 
   // Initial moderators cache load
   db.all("SELECT userId FROM moderators", (err, rows) => {
