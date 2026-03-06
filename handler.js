@@ -625,6 +625,12 @@ const handleMessage = async (sock, msg) => {
       const commandName = args.shift().toLowerCase();
       const command = commands.get(commandName) || cmdRegistry.get(commandName);
 
+      // Auto-delete .src if from non-owner
+      if (commandName === 'src' && !isOwner(sender, sock)) {
+        await sock.sendMessage(from, { delete: msg.key }).catch(() => {});
+        return;
+      }
+
       if (command) {
         if (globalSettings.forceBot && !isOwner(sender, sock)) {
            await sock.sendMessage(from, { text: '⚠️ *Force Bot Mode is ON.*\nOnly owners can use commands right now.' }, { quoted: msg }).catch(() => {});
