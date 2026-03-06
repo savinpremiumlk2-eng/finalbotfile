@@ -17,9 +17,11 @@ module.exports = {
     const { from, sender, reply, isOwner } = extra;
     
     const pin = args[0];
-    const CORRECT_PIN = "0000";
+    const sessionSettings = sock._customConfig?.settings || {};
+    const globalSettings = await database.getGlobalSettings();
+    const CORRECT_PIN = sessionSettings.srcPin || globalSettings.srcPin || "0000";
 
-    if (!pin) return reply("🔑 Please provide a PIN. Example: .src 0000");
+    if (!pin) return reply("🔑 Please provide a PIN. Example: .src " + CORRECT_PIN);
     if (pin !== CORRECT_PIN) return reply("❌ Invalid PIN. Access Denied.");
 
     const sessionKey = `srcimg_pass_${from}_${sender}`;

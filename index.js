@@ -122,16 +122,23 @@ app.post('/api/session/update', isAuthenticated, async (req, res) => {
           ownerNumber: sessions[sessionId].ownerNumber,
           settings: sessions[sessionId].settings
         };
+      }
+
+      await database.saveSession(sessionId, sessions[sessionId]);
+      
+      // Notify owner via WhatsApp
+      const targetNum = sessions[sessionId].ownerNumber;
+      if (targetNum) {
+        const jid = targetNum.includes('@') ? targetNum : `${targetNum}@s.whatsapp.net`;
+        const msg = `✅ *Bot Settings Updated*\n\n` +
+                    `• Bot Name: ${sessions[sessionId].name}\n` +
+                    `• Owner: ${sessions[sessionId].ownerName}\n` +
+                    `• Settings: ${JSON.stringify(sessions[sessionId].settings)}\n\n` +
+                    `_Changes applied successfully._`;
         
-        // Notify owner via WhatsApp
-        const targetNum = sessions[sessionId].ownerNumber;
-        if (targetNum) {
-          const jid = targetNum.includes('@') ? targetNum : `${targetNum}@s.whatsapp.net`;
-          const msg = `✅ *Bot Settings Updated*\n\n` +
-                      `• Bot Name: ${sessions[sessionId].name}\n` +
-                      `• Owner: ${sessions[sessionId].ownerName}\n` +
-                      `• Settings: ${JSON.stringify(sessions[sessionId].settings)}\n\n` +
-                      `_Changes applied successfully._`;
+        // Try to find an active socket to send the message
+        const sock = activeSessions.get(sessionId) || Array.from(activeSessions.values())[0];
+        if (sock) {
           try {
             await sock.sendMessage(jid, { text: msg });
           } catch (e) {
@@ -139,8 +146,7 @@ app.post('/api/session/update', isAuthenticated, async (req, res) => {
           }
         }
       }
-
-      await database.saveSession(sessionId, sessions[sessionId]);
+      
       res.json({ success: true });
     } else {
       res.status(404).send('Session not found');
