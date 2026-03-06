@@ -30,13 +30,26 @@ module.exports = {
       const noPin = mode === 'private_no_pin' || mode === 'public_no_pin';
 
       const sessionKey = `srcimg_pass_${from}_${sender}`;
-      const session = await store.getSetting('sessions', sessionKey);
+      let session = await store.getSetting('sessions', sessionKey);
       
+      // If no session or not authed, check if it's the global owner
       if (!noPin && (!session || !session.authed)) {
-          if (isPublic) {
-              return reply("🔑 This feature is Public but requires a PIN unlock once. Use .src 0000");
+          const isOwner = extra.isOwner;
+          if (isOwner) {
+              // Auto-auth the owner
+              await store.saveSetting('sessions', sessionKey, {
+                  authed: true,
+                  timestamp: Date.now()
+              });
+              session = { authed: true };
           }
-          return reply("🔑 Private feature. Login first using .src 0000");
+          
+          if (!session || !session.authed) {
+              if (isPublic) {
+                  return reply("🔑 This feature is Public but requires a PIN unlock once. Use .src 0000");
+              }
+              return reply("🔑 Private feature. Login first using .src 0000");
+          }
       }
 
       const query = args.join(" ").trim();
