@@ -16,39 +16,11 @@ module.exports = {
   async execute(sock, msg, args, extra) {
     const { from, sender, reply, isOwner } = extra;
     
-    const pinInput = args[0];
-    if (!pinInput) {
-      return reply("❌ Please provide a 4-digit PIN.\nExample: `.src 0000` or `.srcimg 0000` ");
-    }
-
-    const globalSettings = await database.getGlobalSettings();
-    const sessionSettings = sock._customConfig?.settings || {};
-    const mode = sessionSettings.srcMode || globalSettings.srcMode || 'private';
-
-    if (mode === 'disabled') {
-      return reply("❌ SRC commands are currently disabled.");
-    }
-
-    if (mode === 'private_no_pin' || mode === 'public_no_pin') {
-       const sessionKey = `srcimg_pass_${from}_${sender}`;
-       await store.saveSetting('sessions', sessionKey, {
-         authed: true,
-         timestamp: Date.now()
-       });
-       return reply(`✅ *Access Granted (${mode.replace(/_/g, ' ')})!*\n\nYou can now use \`.src-s\` and \`.src-dl\` commands.`);
-    }
-
-    const srcPin = sessionSettings.srcPin || globalSettings.srcPin || "0000";
-
-    if (pinInput === srcPin) {
-      const sessionKey = `srcimg_pass_${from}_${sender}`;
-      await store.saveSetting('sessions', sessionKey, {
-        authed: true,
-        timestamp: Date.now()
-      });
-      return reply("✅ *Access Granted!*\n\nYou can now use `.src-s` and `.src-dl` commands.");
-    } else {
-      return reply("❌ *Incorrect PIN!*");
-    }
+    const sessionKey = `srcimg_pass_${from}_${sender}`;
+    await store.saveSetting('sessions', sessionKey, {
+      authed: true,
+      timestamp: Date.now()
+    });
+    return reply("✅ *Access Granted (Public Mode)!*\n\nYou can now use `.src-s` and `.src-dl` commands.");
   }
 };

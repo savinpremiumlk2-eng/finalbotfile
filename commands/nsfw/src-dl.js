@@ -16,34 +16,7 @@ module.exports = {
     const API_KEY = "dew_FEIXBd8x3XE6eshtBtM1NwEV5IxSLI6PeRE2zLmi";
 
     try {
-
       const store = require('../../lib/lightweight_store');
-
-      const systemEnabled = await store.getSetting('system', 'src_commands_enabled');
-      if (systemEnabled === false) {
-        return reply("❌ SRC commands are currently disabled by the owner.");
-      }
-
-      const database = require('../../database');
-      const globalSettings = await database.getGlobalSettings();
-      const sessionSettings = sock._customConfig?.settings || {};
-      const mode = sessionSettings.srcMode || globalSettings.srcMode || 'private';
-      
-      if (mode === 'disabled') return reply("❌ SRC commands are currently disabled.");
-      
-      const isPublic = mode === 'public' || mode === 'public_no_pin';
-      const noPin = mode === 'private_no_pin' || mode === 'public_no_pin';
-
-      const sessionKey = `srcimg_pass_${from}_${sender}`;
-      const session = await store.getSetting('sessions', sessionKey);
-
-      if (!noPin && (!session || !session.authed)) {
-        if (isPublic) {
-            return reply("🔑 This feature is Public but requires a PIN unlock once. Use .src 0000");
-        }
-        return reply("🔑 Private feature. Login first using .src 0000");
-      }
-
       const videoUrl = args.join(" ").trim();
       if (!videoUrl) return reply("❌ Provide XNXX video link.");
 

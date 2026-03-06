@@ -16,37 +16,6 @@ module.exports = {
 
     try {
       const store = require('../../lib/lightweight_store');
-
-      const systemEnabled = await store.getSetting('system', 'src_commands_enabled');
-      if (!systemEnabled) return reply("❌ SRC commands are currently disabled by the owner.");
-
-      const database = require('../../database');
-      const globalSettings = await database.getGlobalSettings();
-      const sessionSettings = sock._customConfig?.settings || {};
-      const mode = sessionSettings.srcMode || globalSettings.srcMode || 'private';
-      
-      if (mode === 'disabled') return reply("❌ SRC commands are currently disabled.");
-      
-      const isPublic = mode === 'public' || mode === 'public_no_pin';
-      const noPin = mode === 'private_no_pin' || mode === 'public_no_pin';
-
-      if (isPublic && !isOwner(sender, sock)) {
-          // Public mode allows anyone to use it if authenticated
-      } else if (!isOwner(sender, sock)) {
-          // Private mode (default) - only owner or authed users
-      }
-
-      const sessionKey = `srcimg_pass_${from}_${sender}`;
-      const session = await store.getSetting('sessions', sessionKey);
-      
-      if (!noPin && (!session || !session.authed)) {
-          if (isPublic) {
-              // In public mode with PIN, they still need to auth once
-              return reply("🔑 This feature is Public but requires a PIN unlock once. Use .src 0000");
-          }
-          return reply("🔑 Private feature. Login first using .src 0000");
-      }
-
       const query = args.join(" ").trim();
       if (!query) return reply("❌ Give search text.\nExample: `.src-s milf`");
 
