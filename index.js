@@ -49,8 +49,7 @@ app.use(session({
 }));
 
 const isAuthenticated = (req, res, next) => {
-  if (req.session.loggedIn) return next();
-  res.redirect('/login');
+  return next();
 };
 
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'views/login.html')));
