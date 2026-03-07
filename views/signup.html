@@ -1,45 +1,147 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Infinity MD | Signup</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
-    <style>
-        :root { --neon-blue: #00f3ff; --neon-pink: #ff00ff; --dark-bg: #050505; }
-        body { background-color: var(--dark-bg); color: white; font-family: 'Rajdhani', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .signup-card { background: rgba(20, 20, 20, 0.8); border: 1px solid var(--neon-pink); padding: 40px; border-radius: 10px; box-shadow: 0 0 20px rgba(255,0,255,0.2); width: 300px; text-align: center; }
-        h2 { font-family: 'Orbitron'; color: var(--neon-pink); margin-bottom: 30px; }
-        input { background: #111; border: 1px solid var(--neon-pink); color: white; padding: 12px; width: 100%; margin-bottom: 20px; border-radius: 5px; box-sizing: border-box; }
-        .btn { background: var(--neon-pink); color: white; border: none; padding: 12px; width: 100%; cursor: pointer; font-family: 'Orbitron'; font-weight: bold; border-radius: 5px; transition: 0.3s; }
-        .btn:hover { background: var(--neon-blue); color: black; box-shadow: 0 0 15px var(--neon-blue); }
-        p { margin-top: 20px; font-size: 0.9rem; }
-        a { color: var(--neon-pink); text-decoration: none; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Infinity MD | Sign Up</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      --bg:#030712;--surface:#111827;--surface-2:#1f2937;--border:#374151;
+      --cyan:#06b6d4;--cyan-glow:rgba(6,182,212,0.15);
+      --purple:#a855f7;--purple-glow:rgba(168,85,247,0.15);
+      --text:#f9fafb;--muted:#9ca3af;--danger:#ef4444;--green:#22c55e;
+    }
+    body{
+      font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
+      min-height:100vh;display:flex;align-items:center;justify-content:center;
+      overflow:hidden;position:relative;
+    }
+    body::before{
+      content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;
+      background:radial-gradient(circle at 70% 30%,var(--purple-glow),transparent 50%),
+                 radial-gradient(circle at 30% 70%,var(--cyan-glow),transparent 50%);
+      animation:bgShift 20s ease-in-out infinite alternate;
+    }
+    @keyframes bgShift{0%{transform:translate(0,0)}100%{transform:translate(5%,-3%)}}
+    .particles{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0}
+    .particle{position:absolute;width:2px;height:2px;background:var(--purple);border-radius:50%;opacity:0.3;animation:float linear infinite}
+    @keyframes float{0%{transform:translateY(100vh) scale(0);opacity:0}10%{opacity:0.3}90%{opacity:0.3}100%{transform:translateY(-10vh) scale(1);opacity:0}}
+    .signup-wrapper{position:relative;z-index:1;width:100%;max-width:420px;padding:20px}
+    .logo{text-align:center;margin-bottom:40px}
+    .logo h1{font-family:'Orbitron',sans-serif;font-size:2rem;background:linear-gradient(135deg,var(--purple),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:2px}
+    .logo p{color:var(--muted);font-size:0.85rem;margin-top:8px;letter-spacing:0.5px}
+    .card{
+      background:rgba(17,24,39,0.8);backdrop-filter:blur(20px);
+      border:1px solid var(--border);border-radius:20px;padding:40px;
+      box-shadow:0 25px 50px rgba(0,0,0,0.5);
+    }
+    .card h2{font-family:'Orbitron',sans-serif;font-size:1.1rem;color:var(--purple);margin-bottom:8px;letter-spacing:1px}
+    .card .subtitle{color:var(--muted);font-size:0.85rem;margin-bottom:30px}
+    .input-group{position:relative;margin-bottom:20px}
+    .input-group label{display:block;font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;font-weight:600}
+    .input-group input{
+      width:100%;padding:14px 16px;background:var(--surface-2);border:1px solid var(--border);
+      border-radius:12px;color:var(--text);font-size:0.95rem;font-family:inherit;
+      transition:border-color 0.3s,box-shadow 0.3s;outline:none;
+    }
+    .input-group input:focus{border-color:var(--purple);box-shadow:0 0 0 3px var(--purple-glow)}
+    .input-group input::placeholder{color:#4b5563}
+    .msg{font-size:0.8rem;margin-bottom:16px;display:none;padding:10px;border-radius:8px}
+    .msg.error{color:var(--danger);background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2)}
+    .msg.success{color:var(--green);background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2)}
+    .password-strength{height:4px;background:var(--surface-2);border-radius:2px;margin-top:8px;overflow:hidden}
+    .password-strength .bar{height:100%;border-radius:2px;transition:width 0.3s,background 0.3s;width:0}
+    .btn{
+      width:100%;padding:14px;border:none;border-radius:12px;font-family:'Inter',sans-serif;
+      font-weight:600;font-size:0.95rem;cursor:pointer;transition:all 0.3s;
+    }
+    .btn-primary{
+      background:linear-gradient(135deg,var(--purple),var(--cyan));color:#fff;
+      box-shadow:0 4px 15px rgba(168,85,247,0.3);
+    }
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(168,85,247,0.4)}
+    .btn-primary:active{transform:translateY(0)}
+    .btn-primary:disabled{opacity:0.6;cursor:not-allowed;transform:none}
+    .btn .spinner{display:none;width:20px;height:20px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;margin:0 auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .divider{display:flex;align-items:center;gap:12px;margin:24px 0}
+    .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+    .divider span{color:var(--muted);font-size:0.75rem;text-transform:uppercase;letter-spacing:1px}
+    .footer-link{text-align:center;color:var(--muted);font-size:0.85rem}
+    .footer-link a{color:var(--purple);text-decoration:none;font-weight:600;transition:color 0.3s}
+    .footer-link a:hover{color:var(--cyan)}
+    .version{text-align:center;margin-top:30px;color:#374151;font-size:0.7rem;font-family:'Orbitron',sans-serif;letter-spacing:2px}
+  </style>
 </head>
 <body>
-    <div class="signup-card">
-        <h2>SIGN UP</h2>
-        <input type="text" id="username" placeholder="Username">
-        <input type="password" id="password" placeholder="Password">
-        <button class="btn" onclick="signup()">CREATE ACCOUNT</button>
-        <p>Already have an account? <a href="/login">Login</a></p>
+  <div class="particles" id="particles"></div>
+  <div class="signup-wrapper">
+    <div class="logo">
+      <h1>INFINITY MD</h1>
+      <p>Create your bot control account</p>
     </div>
-    <script>
-        async function signup() {
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const res = await fetch('/api/auth/signup', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
-            const data = await res.json();
-            if (data.success) {
-                alert('Signup successful! Please login.');
-                location.href = '/login';
-            } else alert(data.message || 'Signup failed');
-        }
-    </script>
+    <div class="card">
+      <h2>GET STARTED</h2>
+      <p class="subtitle">Set up your account in seconds</p>
+      <div class="msg" id="msgEl"></div>
+      <div class="input-group">
+        <label>Username</label>
+        <input type="text" id="username" placeholder="Choose a username" autocomplete="username">
+      </div>
+      <div class="input-group">
+        <label>Password</label>
+        <input type="password" id="password" placeholder="Create a strong password" autocomplete="new-password" oninput="checkStrength(this.value)">
+        <div class="password-strength"><div class="bar" id="strengthBar"></div></div>
+      </div>
+      <div class="input-group">
+        <label>Confirm Password</label>
+        <input type="password" id="confirmPassword" placeholder="Confirm your password" autocomplete="new-password">
+      </div>
+      <button class="btn btn-primary" id="signupBtn" onclick="signup()">
+        <span class="btn-text">Create Account</span>
+        <div class="spinner"></div>
+      </button>
+      <div class="divider"><span>or</span></div>
+      <p class="footer-link">Already have an account? <a href="/login">Sign in</a></p>
+    </div>
+    <p class="version">v5.1.0</p>
+  </div>
+  <script>
+    (function(){const c=document.getElementById('particles');for(let i=0;i<30;i++){const p=document.createElement('div');p.className='particle';p.style.left=Math.random()*100+'%';p.style.animationDuration=(8+Math.random()*12)+'s';p.style.animationDelay=Math.random()*10+'s';p.style.width=p.style.height=(1+Math.random()*2)+'px';c.appendChild(p)}})();
+    document.getElementById('confirmPassword').addEventListener('keydown',e=>{if(e.key==='Enter')signup()});
+    function checkStrength(pw){
+      const bar=document.getElementById('strengthBar');
+      let s=0;
+      if(pw.length>=6)s++;if(pw.length>=10)s++;if(/[A-Z]/.test(pw))s++;if(/[0-9]/.test(pw))s++;if(/[^a-zA-Z0-9]/.test(pw))s++;
+      const pct=[0,20,40,60,80,100][s];
+      const col=['#ef4444','#ef4444','#f59e0b','#f59e0b','#22c55e','#22c55e'][s];
+      bar.style.width=pct+'%';bar.style.background=col;
+    }
+    function showMsg(text,type){
+      const el=document.getElementById('msgEl');
+      el.textContent=text;el.className='msg '+type;el.style.display='block';
+    }
+    async function signup(){
+      const btn=document.getElementById('signupBtn');
+      const u=document.getElementById('username').value.trim();
+      const p=document.getElementById('password').value;
+      const cp=document.getElementById('confirmPassword').value;
+      document.getElementById('msgEl').style.display='none';
+      if(!u||!p){showMsg('Please fill in all fields','error');return}
+      if(u.length<3){showMsg('Username must be at least 3 characters','error');return}
+      if(p.length<4){showMsg('Password must be at least 4 characters','error');return}
+      if(p!==cp){showMsg('Passwords do not match','error');return}
+      btn.disabled=true;btn.querySelector('.btn-text').style.display='none';btn.querySelector('.spinner').style.display='block';
+      try{
+        const res=await fetch('/api/auth/signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+        const data=await res.json();
+        if(data.success){showMsg('Account created! Redirecting to login...','success');setTimeout(()=>window.location.href='/login',1500)}
+        else{showMsg(data.message||'Signup failed. Username may already exist.','error')}
+      }catch(e){showMsg('Connection error. Please try again.','error')}
+      finally{btn.disabled=false;btn.querySelector('.btn-text').style.display='';btn.querySelector('.spinner').style.display='none'}
+    }
+  </script>
 </body>
 </html>

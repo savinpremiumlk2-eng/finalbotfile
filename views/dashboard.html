@@ -1,665 +1,726 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Infinity MD | Super Dashboard</title>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Infinity MD | Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+*{margin:0;padding:0;box-sizing:border-box}
 :root{
-  --bg:#05070d;
-  --panel:#0f172a;
-  --panel-2:#111827;
-  --border:#1f2937;
-  --neon:#00f5ff;
-  --neon-soft:rgba(0,245,255,0.15);
-  --pink:#ff00c8;
-  --green:#00ff88;
-  --red:#ff3b3b;
-  --text:#e5e7eb;
-  --muted:#94a3b8;
+  --bg:#030712;--surface:#0f172a;--surface-2:#1e293b;--surface-3:#334155;
+  --border:#1e293b;--border-hover:#475569;
+  --cyan:#06b6d4;--cyan-glow:rgba(6,182,212,0.12);
+  --purple:#a855f7;--purple-glow:rgba(168,85,247,0.12);
+  --green:#22c55e;--green-glow:rgba(34,197,94,0.12);
+  --red:#ef4444;--amber:#f59e0b;
+  --text:#f1f5f9;--muted:#94a3b8;--dim:#64748b;
   --radius:16px;
 }
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 
-*{box-sizing:border-box;margin:0;padding:0}
-
-body{
-  font-family:'Inter',sans-serif;
-  background:radial-gradient(circle at top,var(--neon-soft),transparent 40%),var(--bg);
-  color:var(--text);
-  min-height: 100vh;
+/* Sidebar */
+.layout{display:flex;min-height:100vh}
+.sidebar{
+  width:260px;background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;
+  transition:transform 0.3s;
 }
-
-.container{
-  max-width:1400px;
-  margin:auto;
-  padding:30px;
+.sidebar-header{padding:24px;border-bottom:1px solid var(--border)}
+.sidebar-header h1{
+  font-family:'Orbitron',sans-serif;font-size:1.2rem;
+  background:linear-gradient(135deg,var(--cyan),var(--purple));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
 }
-
-/* HEADER */
-header{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:40px;
+.sidebar-header p{font-size:0.7rem;color:var(--dim);margin-top:4px;letter-spacing:0.5px}
+.nav{flex:1;padding:16px 12px;overflow-y:auto}
+.nav-item{
+  display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;
+  cursor:pointer;color:var(--muted);font-size:0.9rem;font-weight:500;
+  transition:all 0.2s;margin-bottom:4px;border:1px solid transparent;
 }
+.nav-item:hover{background:var(--surface-2);color:var(--text)}
+.nav-item.active{background:var(--cyan-glow);color:var(--cyan);border-color:rgba(6,182,212,0.2)}
+.nav-item .icon{font-size:1.1rem;width:24px;text-align:center}
+.sidebar-footer{padding:16px;border-top:1px solid var(--border)}
+.user-info{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:12px;background:var(--surface-2)}
+.user-avatar{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--purple));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem}
+.user-details{flex:1;min-width:0}
+.user-details .name{font-weight:600;font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-details .role{font-size:0.7rem;color:var(--dim)}
 
-.brand h1{
-  font-family:'Orbitron',sans-serif;
-  font-size:2rem;
-  background:linear-gradient(90deg,var(--neon),var(--pink));
-  -webkit-background-clip:text;
-  -webkit-text-fill-color:transparent;
+/* Main content */
+.main{flex:1;margin-left:260px;min-height:100vh}
+.topbar{
+  padding:16px 32px;border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:center;
+  background:rgba(15,23,42,0.8);backdrop-filter:blur(12px);
+  position:sticky;top:0;z-index:50;
 }
+.topbar-title{font-weight:600;font-size:1.1rem}
+.topbar-actions{display:flex;gap:10px;align-items:center}
+.content{padding:32px}
 
-.brand p{
-  font-size:0.9rem;
-  color:var(--muted);
-  margin-top:6px;
-}
-
-.btn{
-  padding:10px 18px;
-  border-radius:12px;
-  border:1px solid var(--border);
-  background:var(--panel-2);
-  color:var(--text);
-  cursor:pointer;
-  transition:0.3s ease;
-  font-weight:600;
-  font-size: 0.85rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  text-decoration: none;
-}
-
-.btn:hover{
-  border-color:var(--neon);
-  box-shadow:0 0 12px var(--neon-soft);
-}
-
-.btn-primary{
-  background:linear-gradient(90deg,var(--neon),var(--pink));
-  border:none;
-  color:#000;
-}
-
-.btn-danger{
-  background:var(--red);
-  border:none;
-  color:#fff;
-}
-
-.btn-success {
-  background: #25D366;
-  color: white;
-  border: none;
-}
-
+/* Cards */
 .card{
-  background:var(--panel);
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  padding:22px;
-  margin-bottom:25px;
-  backdrop-filter:blur(12px);
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:24px;margin-bottom:24px;transition:border-color 0.3s;
 }
+.card:hover{border-color:var(--border-hover)}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.card-title{font-weight:600;font-size:0.95rem;display:flex;align-items:center;gap:8px}
+.card-title .dot{width:8px;height:8px;border-radius:50%}
 
-.card h3{
-  margin-bottom:18px;
-  font-size:1rem;
-  font-weight:600;
-  color:var(--neon);
-  text-transform: uppercase;
-  letter-spacing: 1px;
+/* Stat cards */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;transition:all 0.3s;position:relative;overflow:hidden;
 }
+.stat-card:hover{border-color:var(--border-hover);transform:translateY(-2px)}
+.stat-card .stat-icon{font-size:1.5rem;margin-bottom:12px}
+.stat-card .stat-value{font-size:1.8rem;font-weight:700;font-family:'Orbitron',sans-serif;margin-bottom:4px}
+.stat-card .stat-label{font-size:0.75rem;color:var(--dim);text-transform:uppercase;letter-spacing:1px}
+.stat-card.cyan .stat-value{color:var(--cyan)}
+.stat-card.purple .stat-value{color:var(--purple)}
+.stat-card.green .stat-value{color:var(--green)}
+.stat-card.amber .stat-value{color:var(--amber)}
+.stat-card::after{content:'';position:absolute;top:0;right:0;width:80px;height:80px;border-radius:50%;opacity:0.05}
+.stat-card.cyan::after{background:var(--cyan)}
+.stat-card.purple::after{background:var(--purple)}
+.stat-card.green::after{background:var(--green)}
 
-.grid{
-  display:grid;
-  gap:20px;
+/* Grid layouts */
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px}
+.grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+
+/* Buttons */
+.btn{
+  padding:10px 18px;border-radius:10px;border:1px solid var(--border);
+  background:var(--surface-2);color:var(--text);cursor:pointer;
+  transition:all 0.2s;font-weight:500;font-size:0.85rem;font-family:inherit;
+  display:inline-flex;align-items:center;gap:6px;text-decoration:none;
 }
+.btn:hover{border-color:var(--border-hover);background:var(--surface-3)}
+.btn-sm{padding:6px 12px;font-size:0.78rem;border-radius:8px}
+.btn-primary{background:linear-gradient(135deg,var(--cyan),#0891b2);border:none;color:#fff}
+.btn-primary:hover{box-shadow:0 4px 15px var(--cyan-glow);transform:translateY(-1px)}
+.btn-danger{background:var(--red);border:none;color:#fff}
+.btn-danger:hover{box-shadow:0 4px 15px rgba(239,68,68,0.3)}
+.btn-success{background:var(--green);border:none;color:#fff}
+.btn-ghost{background:transparent;border:none;color:var(--muted)}
+.btn-ghost:hover{color:var(--text);background:var(--surface-2)}
 
-.grid-2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));}
-.grid-3{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));}
-.grid-4{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));}
-
-.stat{
-  background:var(--panel-2);
-  padding:20px;
-  border-radius:14px;
-  border:1px solid var(--border);
-  transition:0.3s;
-  text-align: center;
-}
-
-.stat:hover{
-  border-color:var(--neon);
-  box-shadow:0 0 15px var(--neon-soft);
-}
-
-.stat span{
-  font-size:0.75rem;
-  color:var(--muted);
-  text-transform: uppercase;
-}
-
-.stat strong{
-  font-size:1.6rem;
-  display:block;
-  margin-top:6px;
-  color: var(--neon);
-}
-
+/* Inputs */
 input,textarea,select{
-  width:100%;
-  padding:12px;
-  border-radius:12px;
-  border:1px solid var(--border);
-  background:var(--panel-2);
-  color:var(--text);
-  margin-bottom:12px;
-  font-family: inherit;
+  width:100%;padding:12px 16px;border-radius:10px;border:1px solid var(--border);
+  background:var(--surface-2);color:var(--text);font-family:inherit;font-size:0.9rem;
+  transition:border-color 0.3s,box-shadow 0.3s;outline:none;
 }
+input:focus,textarea:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyan-glow)}
+textarea{resize:vertical;min-height:80px}
 
-textarea{resize:none}
-
+/* Session cards */
 .session-card{
-  background:var(--panel-2);
-  border:1px solid var(--border);
-  border-radius:16px;
-  padding:20px;
-  transition:0.3s;
-  position: relative;
+  background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;transition:all 0.3s;
 }
-
-.session-card:hover{
-  border-color:var(--pink);
-  box-shadow:0 0 15px rgba(255,0,200,0.2);
-}
-
-.session-header{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:15px;
-}
-
+.session-card:hover{border-color:var(--cyan);box-shadow:0 0 20px var(--cyan-glow)}
+.session-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.session-name{font-weight:600;font-size:1rem;margin-bottom:4px}
 .badge{
-  padding:4px 10px;
-  border-radius:20px;
-  font-size:0.7rem;
-  font-weight:700;
-  text-transform: uppercase;
+  padding:4px 10px;border-radius:20px;font-size:0.7rem;font-weight:600;
+  text-transform:uppercase;letter-spacing:0.5px;
 }
+.badge-online{background:var(--green-glow);color:var(--green);border:1px solid rgba(34,197,94,0.2)}
+.badge-offline{background:rgba(239,68,68,0.1);color:var(--red);border:1px solid rgba(239,68,68,0.2)}
+.session-meta{font-size:0.82rem;color:var(--dim);margin-bottom:14px;line-height:1.6}
+.session-actions{display:flex;gap:8px;flex-wrap:wrap;padding-top:14px;border-top:1px solid var(--border)}
 
-.online{background:rgba(0,255,136,0.15);color:var(--green)}
-.offline{background:rgba(255,59,59,0.15);color:var(--red)}
-
-.session-actions{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  margin-top:15px;
-  border-top: 1px solid var(--border);
-  padding-top: 15px;
+/* Edit panel */
+.edit-panel{
+  margin-top:16px;padding:16px;background:rgba(0,0,0,0.2);border-radius:12px;
+  display:none;border:1px solid var(--border);
 }
+.edit-panel .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.edit-panel label{display:flex;align-items:center;gap:8px;font-size:0.85rem;color:var(--muted);cursor:pointer;padding:6px 0}
+.edit-panel label input[type="checkbox"]{width:auto;margin:0}
 
-.edit-panel {
-  margin-top: 15px;
-  padding: 15px;
-  background: rgba(0,0,0,0.2);
-  border-radius: 12px;
-  display: none;
+/* Toggle switch */
+.toggle-row{display:flex;flex-wrap:wrap;gap:16px;align-items:center}
+.toggle-label{display:flex;align-items:center;gap:10px;cursor:pointer;padding:8px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2);transition:all 0.2s;font-size:0.85rem}
+.toggle-label:hover{border-color:var(--border-hover)}
+.toggle-label input{width:auto;margin:0}
+
+/* Admin panel */
+.admin-card{border-color:rgba(168,85,247,0.3)}
+.admin-card:hover{border-color:var(--purple)}
+.admin-tag{font-size:0.65rem;color:var(--purple);border:1px solid rgba(168,85,247,0.3);padding:2px 8px;border-radius:6px;font-weight:600}
+
+/* User & bot list items */
+.list-item{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px;border-bottom:1px solid var(--border);font-size:0.85rem;
 }
+.list-item:last-child{border-bottom:none}
+.list-scroll{max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:12px;background:var(--surface-2)}
 
-footer{
-  margin-top:60px;
-  text-align:center;
-  color:var(--muted);
-  font-size:0.8rem;
-  padding-bottom: 20px;
+/* Page sections */
+.page{display:none}
+.page.active{display:block}
+
+/* Toast */
+.toast-container{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px}
+.toast{
+  padding:14px 20px;border-radius:12px;font-size:0.85rem;font-weight:500;
+  backdrop-filter:blur(12px);animation:slideIn 0.3s ease;min-width:280px;
+  display:flex;align-items:center;gap:10px;box-shadow:0 8px 30px rgba(0,0,0,0.4);
 }
+.toast.success{background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);color:var(--green)}
+.toast.error{background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:var(--red)}
+.toast.info{background:rgba(6,182,212,0.15);border:1px solid rgba(6,182,212,0.3);color:var(--cyan)}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 
-.admin-only {
-  border-color: var(--pink) !important;
-}
-
+/* Mobile */
+.mobile-toggle{display:none;position:fixed;top:16px;left:16px;z-index:200;background:var(--surface);border:1px solid var(--border);padding:10px;border-radius:10px;color:var(--text);cursor:pointer;font-size:1.2rem}
 @media(max-width:768px){
-  header{flex-direction:column;align-items:center;text-align:center;gap:20px}
-  .grid-4 { grid-template-columns: 1fr 1fr; }
+  .sidebar{transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .main{margin-left:0}
+  .mobile-toggle{display:block}
+  .content{padding:20px 16px}
+  .topbar{padding:16px}
+  .stats-grid{grid-template-columns:1fr 1fr}
+  .grid-2{grid-template-columns:1fr}
+  .edit-panel .form-grid{grid-template-columns:1fr}
 }
-
 </style>
 </head>
 <body>
 
-<div class="container">
+<button class="mobile-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+<div class="toast-container" id="toasts"></div>
 
-<header>
-  <div class="brand">
-    <h1>INFINITY MD</h1>
-    <p>Advanced WhatsApp Multi‑Device Bot Control System</p>
-  </div>
-  <div style="display:flex;gap:10px;align-items:center;">
-    <div id="userChannelLink" style="display: none;">
-      <a id="channelHref" href="#" target="_blank" class="btn btn-success">
-        <span>🟢 JOIN CHANNEL</span>
-      </a>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>INFINITY MD</h1>
+      <p>Bot Control System</p>
     </div>
-    <button class="btn btn-danger" onclick="location.href='/login'">Logout</button>
-  </div>
-</header>
-
-<!-- SYSTEM OVERVIEW -->
-<div class="grid grid-3" style="margin-bottom: 30px;">
-  <div class="stat">
-    <span>System Uptime</span>
-    <strong id="stat-uptime">0h 0m 0s</strong>
-  </div>
-  <div class="stat">
-    <span>Active Sessions</span>
-    <strong id="stat-online">0</strong>
-  </div>
-  <div class="stat">
-    <span>Server RAM</span>
-    <strong id="stat-ram">0 MB</strong>
-  </div>
-</div>
-
-<!-- MASTER CONTROL PANEL (Admin Only) -->
-<div id="ownerAdminPanel" class="card admin-only" style="display: none;">
-  <h3 style="color: var(--pink);">👑 MASTER CONTROL PANEL</h3>
-  
-  <div class="grid grid-4" style="margin-bottom: 25px;">
-    <div class="stat" style="background: rgba(255,0,200,0.05);">
-      <span>Total Users</span>
-      <strong id="adm-users" style="color: var(--pink);">0</strong>
-    </div>
-    <div class="stat" style="background: rgba(255,0,200,0.05);">
-      <span>Total Bots</span>
-      <strong id="adm-bots" style="color: var(--pink);">0</strong>
-    </div>
-    <div class="stat" style="background: rgba(255,0,200,0.05);">
-      <span>Active Bots</span>
-      <strong id="adm-online" style="color: var(--green);">0</strong>
-    </div>
-    <div class="stat" style="background: rgba(255,0,200,0.05);">
-      <span>RSS Memory</span>
-      <strong id="adm-ram">0 MB</strong>
-    </div>
-  </div>
-
-  <div class="grid grid-2">
-    <div>
-      <h3>Channel Config</h3>
-      <div style="display: flex; gap: 10px;">
-        <input type="text" id="whatsappChannelInput" placeholder="WhatsApp Channel Link" style="margin-bottom: 0;">
-        <button class="btn btn-primary" onclick="updateChannelLink()">Save</button>
+    <nav class="nav">
+      <div class="nav-item active" onclick="showPage('overview',this)"><span class="icon">&#9632;</span> Overview</div>
+      <div class="nav-item" onclick="showPage('sessions',this)"><span class="icon">&#9881;</span> Bot Sessions</div>
+      <div class="nav-item" onclick="showPage('deploy',this)"><span class="icon">&#10010;</span> Deploy Bot</div>
+      <div class="nav-item" onclick="showPage('settings',this)"><span class="icon">&#9881;</span> Settings</div>
+      <div class="nav-item" id="nav-admin" style="display:none" onclick="showPage('admin',this)"><span class="icon">&#9733;</span> Admin Panel</div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="userAvatar">?</div>
+        <div class="user-details">
+          <div class="name" id="userName">Loading...</div>
+          <div class="role" id="userRole">User</div>
+        </div>
       </div>
     </div>
-    <div>
-      <h3>Broadcast</h3>
-      <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-        <select id="broadcastTarget">
-          <option value="all">Bot Owners</option>
-          <option value="contacts">All Contacts</option>
-        </select>
-        <select id="broadcastType">
-          <option value="info">📢 Info</option>
-          <option value="warn">⚠️ Warning</option>
-          <option value="alert">🚨 Alert</option>
-        </select>
-      </div>
-      <textarea id="broadcastMsg" placeholder="System message..." style="height: 80px;"></textarea>
-      <button class="btn btn-primary" style="width: 100%;" onclick="sendBroadcast()">Transmit</button>
-    </div>
-  </div>
+  </aside>
 
-  <div class="grid grid-2" style="margin-top: 25px;">
-    <div>
-      <h3>User Registry</h3>
-      <div id="usersList" style="max-height: 200px; overflow-y: auto; background: var(--panel-2); padding: 10px; border-radius: 12px; border: 1px solid var(--border);">
-        Loading...
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="pageTitle">Overview</div>
+      <div class="topbar-actions">
+        <div id="channelLinkWrap" style="display:none">
+          <a id="channelLink" href="#" target="_blank" class="btn btn-success btn-sm">Join Channel</a>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
       </div>
     </div>
-    <div>
-      <h3>Global Bot Network</h3>
-      <div id="adminBotsList" style="max-height: 200px; overflow-y: auto; background: var(--panel-2); padding: 10px; border-radius: 12px; border: 1px solid var(--border);">
-        Loading...
+
+    <div class="content">
+
+      <!-- OVERVIEW PAGE -->
+      <div class="page active" id="page-overview">
+        <div class="stats-grid">
+          <div class="stat-card cyan">
+            <div class="stat-icon">&#9200;</div>
+            <div class="stat-value" id="s-uptime">--</div>
+            <div class="stat-label">Uptime</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-icon">&#9889;</div>
+            <div class="stat-value" id="s-online">0</div>
+            <div class="stat-label">Active Sessions</div>
+          </div>
+          <div class="stat-card purple">
+            <div class="stat-icon">&#128190;</div>
+            <div class="stat-value" id="s-ram">0</div>
+            <div class="stat-label">RAM (MB)</div>
+          </div>
+          <div class="stat-card amber">
+            <div class="stat-icon">&#128187;</div>
+            <div class="stat-value" id="s-total">0</div>
+            <div class="stat-label">Total Bots</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><span class="dot" style="background:var(--green)"></span> Quick Status</div>
+          </div>
+          <div id="quickSessions" class="grid-3"></div>
+        </div>
       </div>
+
+      <!-- SESSIONS PAGE -->
+      <div class="page" id="page-sessions">
+        <div id="sessionsList" class="grid-2"></div>
+      </div>
+
+      <!-- DEPLOY PAGE -->
+      <div class="page" id="page-deploy">
+        <div class="card" style="max-width:600px">
+          <div class="card-header">
+            <div class="card-title"><span class="dot" style="background:var(--cyan)"></span> Deploy New Bot</div>
+          </div>
+          <div style="display:grid;gap:14px">
+            <div>
+              <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Session ID</label>
+              <input type="text" id="inp-sessionId" placeholder="KnightBot!...">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div>
+                <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Bot Name</label>
+                <input type="text" id="inp-botName" placeholder="My Bot">
+              </div>
+              <div>
+                <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Owner Name</label>
+                <input type="text" id="inp-ownerName" placeholder="Your Name">
+              </div>
+            </div>
+            <div>
+              <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Owner Number</label>
+              <input type="text" id="inp-ownerNumber" placeholder="94xxxxxxxxx">
+            </div>
+            <button class="btn btn-primary" style="width:100%;padding:14px;font-size:0.95rem" onclick="addSession()">Deploy Bot Instance</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SETTINGS PAGE -->
+      <div class="page" id="page-settings">
+        <div class="card" style="max-width:700px">
+          <div class="card-header">
+            <div class="card-title"><span class="dot" style="background:var(--cyan)"></span> Global Bot Settings</div>
+          </div>
+          <div class="toggle-row" style="margin-bottom:20px">
+            <label class="toggle-label"><input type="checkbox" id="g-maintenance"> Maintenance</label>
+            <label class="toggle-label"><input type="checkbox" id="g-forceBot"> Force Bot</label>
+            <label class="toggle-label"><input type="checkbox" id="g-antidelete"> Anti-Delete</label>
+            <label class="toggle-label"><input type="checkbox" id="g-autoReact"> Auto-React</label>
+            <label class="toggle-label"><input type="checkbox" id="g-autoStatus"> Auto-Status</label>
+            <label class="toggle-label"><input type="checkbox" id="g-antiviewonce"> Anti-ViewOnce</label>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
+            <div>
+              <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600">SRC Mode</label>
+              <select id="g-srcMode">
+                <option value="private">Private (PIN Required)</option>
+                <option value="private_no_pin">Private (No PIN)</option>
+                <option value="public">Public (PIN Required)</option>
+                <option value="public_no_pin">Public (No PIN)</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600">SRC PIN</label>
+              <input type="text" id="g-srcPin" placeholder="0000" maxlength="6">
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="saveGlobalSettings()">Save Settings</button>
+        </div>
+      </div>
+
+      <!-- ADMIN PAGE -->
+      <div class="page" id="page-admin">
+        <div class="stats-grid" style="margin-bottom:24px">
+          <div class="stat-card purple">
+            <div class="stat-icon">&#128101;</div>
+            <div class="stat-value" id="a-users">0</div>
+            <div class="stat-label">Total Users</div>
+          </div>
+          <div class="stat-card cyan">
+            <div class="stat-icon">&#129302;</div>
+            <div class="stat-value" id="a-bots">0</div>
+            <div class="stat-label">Total Bots</div>
+          </div>
+          <div class="stat-card green">
+            <div class="stat-icon">&#9889;</div>
+            <div class="stat-value" id="a-active">0</div>
+            <div class="stat-label">Active Bots</div>
+          </div>
+          <div class="stat-card amber">
+            <div class="stat-icon">&#128190;</div>
+            <div class="stat-value" id="a-mem">0</div>
+            <div class="stat-label">Memory</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card admin-card">
+            <div class="card-header">
+              <div class="card-title"><span class="dot" style="background:var(--purple)"></span> Channel Config</div>
+            </div>
+            <div style="display:flex;gap:10px">
+              <input type="text" id="adm-channel" placeholder="WhatsApp Channel Link" style="margin:0">
+              <button class="btn btn-primary" onclick="updateChannel()">Save</button>
+            </div>
+          </div>
+          <div class="card admin-card">
+            <div class="card-header">
+              <div class="card-title"><span class="dot" style="background:var(--purple)"></span> Broadcast</div>
+            </div>
+            <div style="display:flex;gap:10px;margin-bottom:10px">
+              <select id="bc-target" style="margin:0"><option value="all">Bot Owners</option><option value="contacts">All Contacts</option></select>
+              <select id="bc-type" style="margin:0"><option value="info">Info</option><option value="warn">Warning</option><option value="alert">Alert</option></select>
+            </div>
+            <textarea id="bc-msg" placeholder="Broadcast message..." style="margin-bottom:10px"></textarea>
+            <button class="btn btn-primary" style="width:100%" onclick="sendBroadcast()">Transmit</button>
+          </div>
+        </div>
+
+        <div class="grid-2" style="margin-top:20px">
+          <div class="card admin-card">
+            <div class="card-header"><div class="card-title"><span class="dot" style="background:var(--purple)"></span> User Registry</div></div>
+            <div class="list-scroll" id="adm-usersList"><div style="padding:16px;color:var(--dim)">Loading...</div></div>
+          </div>
+          <div class="card admin-card">
+            <div class="card-header"><div class="card-title"><span class="dot" style="background:var(--purple)"></span> Bot Network</div></div>
+            <div class="list-scroll" id="adm-botsList"><div style="padding:16px;color:var(--dim)">Loading...</div></div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
-</div>
-
-<!-- GLOBAL SETTINGS -->
-<div id="globalSettingsCard" class="card">
-  <h3>Global Bot Settings</h3>
-  <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: center;" id="globalSettings">
-    <label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="set-maintenance" style="width: auto; margin: 0;"> Maintenance</label>
-    <label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="set-forceBot" style="width: auto; margin: 0;"> Force Bot</label>
-    <label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="set-antidelete" style="width: auto; margin: 0;"> Anti-Delete</label>
-    <label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="set-autoReact" style="width: auto; margin: 0;"> Auto-React</label>
-    <label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="set-autoStatus" style="width: auto; margin: 0;"> Auto-Status</label>
-    <label style="display: flex; align-items: center; gap: 8px;"><input type="checkbox" id="set-antiviewonce" style="width: auto; margin: 0;"> Anti-ViewOnce</label>
-    <div style="display: flex; align-items: center; gap: 8px;">
-      <span style="font-size: 0.9rem;">Global SRC Mode:</span>
-      <select id="set-srcMode" style="width: auto; margin: 0; padding: 4px 8px;">
-        <option value="private">Private (PIN Required)</option>
-        <option value="private_no_pin">Private (No PIN)</option>
-        <option value="public">Public (PIN Required)</option>
-        <option value="public_no_pin">Public (No PIN)</option>
-        <option value="disabled">Disabled</option>
-      </select>
-    </div>
-    <div style="display: flex; align-items: center; gap: 8px;">
-      <span style="font-size: 0.9rem;">Global SRC PIN:</span>
-      <input type="text" id="set-srcPin" placeholder="0000" style="width: 80px; margin: 0; padding: 4px 8px;">
-    </div>
-    <button class="btn btn-primary" onclick="saveGlobalSettings()" style="margin-left: auto;">Update</button>
-  </div>
-</div>
-
-<!-- DEPLOY BOT -->
-<div class="card" id="addBotCard">
-  <h3>Deploy New Bot Instance</h3>
-  <div class="grid grid-2">
-    <input type="text" id="botName" placeholder="Bot Name">
-    <input type="text" id="ownerName" placeholder="Owner Name">
-    <input type="text" id="ownerNumber" placeholder="Owner Number (94xxxx)">
-    <input type="text" id="sessionId" placeholder="Session ID (KnightBot!...)">
-  </div>
-  <button class="btn btn-primary" onclick="addSession()">Deploy Bot</button>
-</div>
-
-<!-- ACTIVE SESSIONS -->
-<h2 style="font-family: 'Orbitron'; color: var(--neon); margin-bottom: 20px; font-size: 1.2rem;">ACTIVE BOT SESSIONS</h2>
-<div id="sessionsList" class="grid grid-2"></div>
-
-<footer>
-Infinity MD • Futuristic WhatsApp Bot Dashboard
-</footer>
-
 </div>
 
 <script>
-let currentUser = null;
+let currentUser=null;
 
-function loadDashboard() {
-  // Stats
-  fetch('/api/stats').then(res => res.json()).then(stats => {
-    document.getElementById('stat-uptime').innerText = stats.uptime;
-    document.getElementById('stat-ram').innerText = stats.ram + ' MB';
-  });
-
-  // User info
-  fetch('/api/user-info').then(res => res.json()).then(user => {
-    currentUser = user;
-    if (user.isOwner) {
-      document.getElementById('ownerAdminPanel').style.display = 'block';
-      loadAdminData();
-    } else {
-      document.getElementById('globalSettingsCard').style.display = 'none';
-    }
-  });
-
-  // Global Settings
-  fetch('/api/global-settings').then(res => res.json()).then(settings => {
-    document.getElementById('set-maintenance').checked = settings.maintenance;
-    document.getElementById('set-forceBot').checked = settings.forceBot;
-    document.getElementById('set-antidelete').checked = settings.antidelete;
-    if(document.getElementById('set-autoReact')) document.getElementById('set-autoReact').checked = settings.autoReact || false;
-    if(document.getElementById('set-autoStatus')) document.getElementById('set-autoStatus').checked = settings.autoStatus || false;
-    if(document.getElementById('set-antiviewonce')) document.getElementById('set-antiviewonce').checked = settings.antiviewonce || false;
-    if(document.getElementById('set-srcMode')) document.getElementById('set-srcMode').value = settings.srcMode || 'private';
-    if(document.getElementById('set-srcPin')) document.getElementById('set-srcPin').value = settings.srcPin || '0000';
-  });
-
-  // Channel link
-  fetch('/api/user/channel').then(res => res.json()).then(data => {
-    if (data.channel) {
-      document.getElementById('userChannelLink').style.display = 'block';
-      document.getElementById('channelHref').href = data.channel;
-    }
-  });
-
-  // Sessions
-  renderSessions();
+function toast(msg,type='info'){
+  const c=document.getElementById('toasts');
+  const t=document.createElement('div');
+  t.className='toast '+type;
+  t.innerHTML=msg;
+  c.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(100%)';setTimeout(()=>t.remove(),300)},3500);
 }
 
-function renderSessions() {
-  fetch('/api/sessions').then(res => res.json()).then(data => {
-    const list = document.getElementById('sessionsList');
-    list.innerHTML = data.length ? '' : '<p style="color: var(--muted)">No bots deployed yet.</p>';
-    
-    data.forEach(s => {
-      const card = document.createElement('div');
-      card.className = 'session-card';
-      card.innerHTML = `
-        <div class="session-header">
-          <div>
-            <strong style="color: var(--neon); font-size: 1.1rem;">${s.name}</strong><br>
-            <span class="badge ${s.status.toLowerCase()}">${s.status}</span>
-          </div>
-          ${currentUser && currentUser.isOwner ? `<span style="font-size: 0.65rem; color: var(--pink); border: 1px solid var(--pink); padding: 2px 6px; border-radius: 4px;">USER: ${s.userId}</span>` : ''}
+function showPage(id,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(el)el.classList.add('active');
+  const titles={overview:'Overview',sessions:'Bot Sessions',deploy:'Deploy Bot',settings:'Settings',admin:'Admin Panel'};
+  document.getElementById('pageTitle').textContent=titles[id]||id;
+  document.querySelector('.sidebar').classList.remove('open');
+  if(id==='sessions')renderSessions();
+  if(id==='admin')loadAdminData();
+}
+
+async function apiFetch(url,opts){
+  const res=await fetch(url,opts);
+  if(res.status===401){window.location.href='/login';throw new Error('Not authenticated')}
+  return res.json();
+}
+
+function logout(){
+  fetch('/api/auth/logout').then(()=>window.location.href='/login');
+}
+
+async function loadDashboard(){
+  try{
+    const stats=await apiFetch('/api/stats');
+    document.getElementById('s-uptime').textContent=stats.uptime;
+    document.getElementById('s-ram').textContent=stats.ram;
+  }catch(e){}
+
+  try{
+    const user=await apiFetch('/api/user-info');
+    currentUser=user;
+    document.getElementById('userName').textContent=user.username;
+    document.getElementById('userAvatar').textContent=user.username[0].toUpperCase();
+    if(user.isOwner){
+      document.getElementById('userRole').textContent='Owner';
+      document.getElementById('nav-admin').style.display='';
+    }else{
+      document.getElementById('userRole').textContent='User';
+    }
+  }catch(e){}
+
+  try{
+    const settings=await apiFetch('/api/global-settings');
+    document.getElementById('g-maintenance').checked=settings.maintenance||false;
+    document.getElementById('g-forceBot').checked=settings.forceBot||false;
+    document.getElementById('g-antidelete').checked=settings.antidelete||false;
+    document.getElementById('g-autoReact').checked=settings.autoReact||false;
+    document.getElementById('g-autoStatus').checked=settings.autoStatus||false;
+    document.getElementById('g-antiviewonce').checked=settings.antiviewonce||false;
+    document.getElementById('g-srcMode').value=settings.srcMode||'private';
+    document.getElementById('g-srcPin').value=settings.srcPin||'0000';
+  }catch(e){}
+
+  try{
+    const ch=await apiFetch('/api/user/channel');
+    if(ch.channel){
+      document.getElementById('channelLinkWrap').style.display='';
+      document.getElementById('channelLink').href=ch.channel;
+    }
+  }catch(e){}
+
+  loadQuickSessions();
+}
+
+async function loadQuickSessions(){
+  try{
+    const sessions=await apiFetch('/api/sessions');
+    const el=document.getElementById('quickSessions');
+    let onlineCount=0;
+    sessions.forEach(s=>{if(s.status==='Online')onlineCount++});
+    document.getElementById('s-online').textContent=onlineCount;
+    document.getElementById('s-total').textContent=sessions.length;
+
+    if(!sessions.length){el.innerHTML='<p style="color:var(--dim);grid-column:1/-1">No bots deployed yet. Go to Deploy Bot to get started.</p>';return}
+    el.innerHTML=sessions.map(s=>`
+      <div class="session-card" style="cursor:pointer" onclick="showPage('sessions',document.querySelectorAll('.nav-item')[1])">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:600">${s.name}</span>
+          <span class="badge badge-${s.status.toLowerCase()}">${s.status}</span>
         </div>
-        <div style="font-size: 0.85rem; color: var(--muted); margin-bottom: 10px;">
-          Owner: ${s.ownerName} (${s.ownerNumber})
+        <div style="font-size:0.8rem;color:var(--dim);margin-top:8px">${s.ownerName}</div>
+      </div>
+    `).join('');
+  }catch(e){}
+}
+
+async function renderSessions(){
+  try{
+    const data=await apiFetch('/api/sessions');
+    const el=document.getElementById('sessionsList');
+    if(!data.length){el.innerHTML='<p style="color:var(--dim);grid-column:1/-1">No bot sessions found.</p>';return}
+
+    el.innerHTML=data.map(s=>`
+      <div class="session-card">
+        <div class="session-top">
+          <div>
+            <div class="session-name">${s.name}</div>
+            ${currentUser&&currentUser.isOwner?`<span class="admin-tag">USER: ${s.userId}</span>`:''}
+          </div>
+          <span class="badge badge-${s.status.toLowerCase()}">${s.status}</span>
+        </div>
+        <div class="session-meta">
+          Owner: ${s.ownerName}<br>
+          Number: ${s.ownerNumber}
         </div>
         <div class="session-actions">
-          <button class="btn" onclick="restartSession('${s.id}')">Restart</button>
-          <button class="btn" onclick="toggleEdit('${s.id}')">Edit</button>
-          <button class="btn btn-danger" onclick="deleteSession('${s.id}')">Delete</button>
+          <button class="btn btn-sm" onclick="restartSession('${esc(s.id)}')">Restart</button>
+          <button class="btn btn-sm" onclick="toggleEdit('${esc(s.id)}')">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteSession('${esc(s.id)}')">Delete</button>
         </div>
-        <div id="edit-${s.id}" class="edit-panel">
-          <input type="text" id="edit-name-${s.id}" value="${s.name}" placeholder="Bot Name">
-          <input type="text" id="edit-owner-${s.id}" value="${s.ownerName}" placeholder="Owner Name">
-          <input type="text" id="edit-num-${s.id}" value="${s.ownerNumber}" placeholder="Owner Number">
-          <div style="margin: 10px 0; border-top: 1px solid var(--border); padding-top: 10px;">
-            <label style="display: block; margin-bottom: 8px; font-size: 0.85rem;"><input type="checkbox" id="edit-antidelete-${s.id}" ${s.settings?.antidelete ? 'checked' : ''}> Anti-Delete</label>
-            <label style="display: block; margin-bottom: 8px; font-size: 0.85rem;"><input type="checkbox" id="edit-autoreact-${s.id}" ${s.settings?.autoreact ? 'checked' : ''}> Auto-React</label>
-            <label style="display: block; margin-bottom: 8px; font-size: 0.85rem;"><input type="checkbox" id="edit-anticall-${s.id}" ${s.settings?.anticall ? 'checked' : ''}> Anti-Call</label>
-            <label style="display: block; margin-bottom: 8px; font-size: 0.85rem;"><input type="checkbox" id="edit-antiviewonce-${s.id}" ${s.settings?.antiviewonce ? 'checked' : ''}> Anti-ViewOnce</label>
-            <div style="margin-bottom: 8px;">
-              <span style="font-size: 0.85rem; color: var(--muted);">SRC Mode:</span>
-              <select id="edit-srcmode-${s.id}" style="padding: 4px; margin-top: 4px;">
-                <option value="private" ${s.settings?.srcMode === 'private' ? 'selected' : ''}>Private (PIN Required)</option>
-                <option value="private_no_pin" ${s.settings?.srcMode === 'private_no_pin' ? 'selected' : ''}>Private (No PIN)</option>
-                <option value="public" ${s.settings?.srcMode === 'public' ? 'selected' : ''}>Public (PIN Required)</option>
-                <option value="public_no_pin" ${s.settings?.srcMode === 'public_no_pin' ? 'selected' : ''}>Public (No PIN)</option>
-                <option value="disabled" ${s.settings?.srcMode === 'disabled' ? 'selected' : ''}>Disabled</option>
+        <div id="edit-${esc(s.id)}" class="edit-panel">
+          <div class="form-grid" style="margin-bottom:14px">
+            <input type="text" id="en-${esc(s.id)}" value="${s.name}" placeholder="Bot Name">
+            <input type="text" id="eo-${esc(s.id)}" value="${s.ownerName}" placeholder="Owner Name">
+            <input type="text" id="em-${esc(s.id)}" value="${s.ownerNumber}" placeholder="Owner Number">
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+            <label style="font-size:0.82rem;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:6px"><input type="checkbox" id="ead-${esc(s.id)}" ${s.settings?.antidelete?'checked':''} style="width:auto;margin:0"> Anti-Delete</label>
+            <label style="font-size:0.82rem;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:6px"><input type="checkbox" id="ear-${esc(s.id)}" ${s.settings?.autoreact?'checked':''} style="width:auto;margin:0"> Auto-React</label>
+            <label style="font-size:0.82rem;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:6px"><input type="checkbox" id="eac-${esc(s.id)}" ${s.settings?.anticall?'checked':''} style="width:auto;margin:0"> Anti-Call</label>
+            <label style="font-size:0.82rem;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:6px"><input type="checkbox" id="eav-${esc(s.id)}" ${s.settings?.antiviewonce?'checked':''} style="width:auto;margin:0"> Anti-ViewOnce</label>
+          </div>
+          <div class="form-grid" style="margin-bottom:14px">
+            <div>
+              <label style="font-size:0.72rem;color:var(--dim);display:block;margin-bottom:4px">SRC Mode</label>
+              <select id="esm-${esc(s.id)}">
+                <option value="private" ${s.settings?.srcMode==='private'?'selected':''}>Private (PIN)</option>
+                <option value="private_no_pin" ${s.settings?.srcMode==='private_no_pin'?'selected':''}>Private (No PIN)</option>
+                <option value="public" ${s.settings?.srcMode==='public'?'selected':''}>Public (PIN)</option>
+                <option value="public_no_pin" ${s.settings?.srcMode==='public_no_pin'?'selected':''}>Public (No PIN)</option>
+                <option value="disabled" ${s.settings?.srcMode==='disabled'?'selected':''}>Disabled</option>
               </select>
             </div>
-            <div style="margin-bottom: 8px;">
-              <span style="font-size: 0.85rem; color: var(--muted);">SRC PIN:</span>
-              <input type="text" id="edit-srcpin-${s.id}" value="${s.settings?.srcPin || ''}" placeholder="4-digit PIN" style="padding: 4px; margin-top: 4px; margin-bottom: 0;">
+            <div>
+              <label style="font-size:0.72rem;color:var(--dim);display:block;margin-bottom:4px">SRC PIN</label>
+              <input type="text" id="esp-${esc(s.id)}" value="${s.settings?.srcPin||''}" placeholder="PIN">
             </div>
           </div>
-          <button class="btn btn-primary" style="width: 100%;" onclick="updateSession('${s.id}')">Save Changes</button>
-        </div>
-      `;
-      list.appendChild(card);
-    });
-  });
-}
-
-function loadAdminData() {
-  fetch('/api/admin/global-settings').then(res => res.json()).then(settings => {
-    document.getElementById('whatsappChannelInput').value = settings.whatsappChannel || '';
-  });
-
-  fetch('/api/admin/stats').then(res => res.json()).then(stats => {
-    document.getElementById('adm-users').innerText = stats.totalUsers || 0;
-    document.getElementById('adm-bots').innerText = stats.totalBots || 0;
-    document.getElementById('adm-online').innerText = stats.activeBots || 0;
-    document.getElementById('adm-ram').innerText = stats.memory || '0 MB';
-  });
-
-  fetch('/api/admin/users').then(res => res.json()).then(users => {
-    const list = document.getElementById('usersList');
-    list.innerHTML = users.length ? users.map(u => `
-      <div style="padding: 10px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
-        <span>👤 ${u.username}</span>
-        <div style="display: flex; gap: 5px;">
-          <button class="btn" style="padding: 4px 8px; font-size: 0.7rem;" onclick="userAction('${u.username}', 'pause')">PAUSE</button>
-          <button class="btn btn-danger" style="padding: 4px 8px; font-size: 0.7rem;" onclick="userAction('${u.username}', 'delete')">DEL</button>
+          <button class="btn btn-primary" style="width:100%" onclick="updateSession('${esc(s.id)}')">Save Changes</button>
         </div>
       </div>
-    `).join('') : '<p style="color: var(--muted); padding: 10px;">No users</p>';
-  });
-
-  fetch('/api/admin/sessions').then(res => res.json()).then(bots => {
-    const list = document.getElementById('adminBotsList');
-    list.innerHTML = bots.map(b => `
-      <div style="padding: 10px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
-        <div>
-          <strong>${b.name}</strong> <span style="color: var(--muted)">(${b.userId})</span>
-        </div>
-        <div style="display: flex; gap: 5px; align-items: center;">
-          <span class="badge ${b.status.toLowerCase()}">${b.status}</span>
-          <button class="btn" style="padding: 4px 8px; font-size: 0.7rem; background: #ffaa00; color: #000;" onclick="warnBot('${b.id}')">WARN</button>
-        </div>
-      </div>
-    `).join('') || '<p style="color: var(--muted); padding: 10px;">No bots</p>';
-  });
+    `).join('');
+  }catch(e){}
 }
 
-function addSession(){
-  const sessionId = document.getElementById('sessionId').value;
-  const botName = document.getElementById('botName').value;
-  const ownerName = document.getElementById('ownerName').value;
-  const ownerNumber = document.getElementById('ownerNumber').value;
+function esc(str){return str.replace(/'/g,"\\'")}
 
-  if(!sessionId) return alert('Session ID required');
-  
-  fetch('/api/session/add', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ sessionId, botName, ownerName, ownerNumber })
-  }).then(res => res.json()).then(data => {
-    if(data.success) {
-      alert('Bot deployed successfully!');
-      location.reload();
-    } else alert('Error: ' + data.message);
-  });
+function toggleEdit(id){
+  const el=document.getElementById('edit-'+id);
+  if(el)el.style.display=el.style.display==='block'?'none':'block';
 }
 
-function restartSession(id) {
-  fetch('/api/session/restart', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ sessionId: id })
-  }).then(() => {
-    alert('Restart signal sent');
-    location.reload();
-  });
+async function addSession(){
+  const sid=document.getElementById('inp-sessionId').value.trim();
+  if(!sid){toast('Session ID is required','error');return}
+  try{
+    const data=await apiFetch('/api/session/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      sessionId:sid,
+      botName:document.getElementById('inp-botName').value||'Infinity MD',
+      ownerName:document.getElementById('inp-ownerName').value,
+      ownerNumber:document.getElementById('inp-ownerNumber').value
+    })});
+    if(data.success){toast('Bot deployed successfully!','success');showPage('sessions',document.querySelectorAll('.nav-item')[1]);loadQuickSessions()}
+    else toast('Error: '+(data.message||'Deploy failed'),'error');
+  }catch(e){toast('Deploy failed','error')}
 }
 
-function deleteSession(id) {
-  if(!confirm('Delete this bot instance?')) return;
-  fetch('/api/session/delete', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ sessionId: id })
-  }).then(() => location.reload());
+async function restartSession(id){
+  try{
+    await apiFetch('/api/session/restart',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:id})});
+    toast('Restart signal sent','success');
+    setTimeout(()=>renderSessions(),2000);
+  }catch(e){toast('Restart failed','error')}
 }
 
-function toggleEdit(id) {
-  const el = document.getElementById(`edit-${id}`);
-  el.style.display = el.style.display === 'block' ? 'none' : 'block';
+async function deleteSession(id){
+  if(!confirm('Delete this bot instance permanently?'))return;
+  try{
+    await apiFetch('/api/session/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:id})});
+    toast('Bot deleted','success');renderSessions();loadQuickSessions();
+  }catch(e){toast('Delete failed','error')}
 }
 
-function updateSession(id) {
-  const settings = {
-    antidelete: document.getElementById(`edit-antidelete-${id}`).checked,
-    autoreact: document.getElementById(`edit-autoreact-${id}`).checked,
-    anticall: document.getElementById(`edit-anticall-${id}`).checked,
-    antiviewonce: document.getElementById(`edit-antiviewonce-${id}`).checked,
-    srcMode: document.getElementById(`edit-srcmode-${id}`).value,
-    srcPin: document.getElementById(`edit-srcpin-${id}`).value
+async function updateSession(id){
+  const settings={
+    antidelete:document.getElementById('ead-'+id)?.checked||false,
+    autoreact:document.getElementById('ear-'+id)?.checked||false,
+    anticall:document.getElementById('eac-'+id)?.checked||false,
+    antiviewonce:document.getElementById('eav-'+id)?.checked||false,
+    srcMode:document.getElementById('esm-'+id)?.value||'private',
+    srcPin:document.getElementById('esp-'+id)?.value||''
   };
-  fetch('/api/session/update', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      sessionId: id,
-      botName: document.getElementById(`edit-name-${id}`).value,
-      ownerName: document.getElementById(`edit-owner-${id}`).value,
-      ownerNumber: document.getElementById(`edit-num-${id}`).value,
+  try{
+    await apiFetch('/api/session/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      sessionId:id,
+      botName:document.getElementById('en-'+id)?.value,
+      ownerName:document.getElementById('eo-'+id)?.value,
+      ownerNumber:document.getElementById('em-'+id)?.value,
       settings
-    })
-  }).then(() => {
-    alert('Settings updated');
-    location.reload();
-  });
+    })});
+    toast('Settings saved','success');renderSessions();
+  }catch(e){toast('Update failed','error')}
 }
 
-function saveGlobalSettings() {
-  const settings = {
-    maintenance: document.getElementById('set-maintenance').checked,
-    forceBot: document.getElementById('set-forceBot').checked,
-    antidelete: document.getElementById('set-antidelete').checked,
-    autoReact: document.getElementById('set-autoReact').checked,
-    autoStatus: document.getElementById('set-autoStatus').checked,
-    antiviewonce: document.getElementById('set-antiviewonce').checked,
-    srcMode: document.getElementById('set-srcMode').value,
-    srcPin: document.getElementById('set-srcPin').value
+async function saveGlobalSettings(){
+  const settings={
+    maintenance:document.getElementById('g-maintenance').checked,
+    forceBot:document.getElementById('g-forceBot').checked,
+    antidelete:document.getElementById('g-antidelete').checked,
+    autoReact:document.getElementById('g-autoReact').checked,
+    autoStatus:document.getElementById('g-autoStatus').checked,
+    antiviewonce:document.getElementById('g-antiviewonce').checked,
+    srcMode:document.getElementById('g-srcMode').value,
+    srcPin:document.getElementById('g-srcPin').value
   };
-  fetch('/api/global-settings/update', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(settings)
-  }).then(() => alert('Global settings saved'));
+  try{
+    await apiFetch('/api/global-settings/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(settings)});
+    toast('Global settings saved','success');
+  }catch(e){toast('Failed to save settings','error')}
 }
 
-function userAction(username, action) {
-  if(!confirm(`Action: ${action} user ${username}?`)) return;
-  fetch('/api/admin/user/action', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ username, action })
-  }).then(() => loadAdminData());
+async function loadAdminData(){
+  try{
+    const settings=await apiFetch('/api/admin/global-settings');
+    document.getElementById('adm-channel').value=settings.whatsappChannel||'';
+  }catch(e){}
+
+  try{
+    const stats=await apiFetch('/api/admin/stats');
+    document.getElementById('a-users').textContent=stats.totalUsers||0;
+    document.getElementById('a-bots').textContent=stats.totalBots||0;
+    document.getElementById('a-active').textContent=stats.activeBots||0;
+    document.getElementById('a-mem').textContent=stats.memory||'0 MB';
+  }catch(e){}
+
+  try{
+    const users=await apiFetch('/api/admin/users');
+    const el=document.getElementById('adm-usersList');
+    el.innerHTML=users.length?users.map(u=>`
+      <div class="list-item">
+        <span>${u.username}</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm" onclick="userAction('${u.username}','pause')">Pause</button>
+          <button class="btn btn-danger btn-sm" onclick="userAction('${u.username}','delete')">Delete</button>
+        </div>
+      </div>
+    `).join(''):'<div style="padding:16px;color:var(--dim)">No users</div>';
+  }catch(e){}
+
+  try{
+    const bots=await apiFetch('/api/admin/sessions');
+    const el=document.getElementById('adm-botsList');
+    el.innerHTML=bots.length?bots.map(b=>`
+      <div class="list-item">
+        <div><strong>${b.name}</strong> <span style="color:var(--dim);font-size:0.75rem">(${b.userId})</span></div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="badge badge-${b.status.toLowerCase()}">${b.status}</span>
+          <button class="btn btn-sm" style="background:var(--amber);color:#000" onclick="warnBot('${esc(b.id)}')">Warn</button>
+        </div>
+      </div>
+    `).join(''):'<div style="padding:16px;color:var(--dim)">No bots</div>';
+  }catch(e){}
 }
 
-function warnBot(sessionId) {
-  const message = prompt('Warning message:');
-  if(!message) return;
-  fetch('/api/admin/bot/warn', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ sessionId, message })
-  }).then(() => alert('Warning sent'));
+async function userAction(username,action){
+  if(!confirm(`${action==='delete'?'Delete':'Pause'} user "${username}"?`))return;
+  try{
+    await apiFetch('/api/admin/user/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,action})});
+    toast(`User ${action}d`,'success');loadAdminData();
+  }catch(e){toast('Action failed','error')}
 }
 
-function updateChannelLink() {
-  const link = document.getElementById('whatsappChannelInput').value;
-  fetch('/api/admin/global-settings/update', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ whatsappChannel: link })
-  }).then(() => alert('Channel link saved'));
+async function warnBot(id){
+  const msg=prompt('Warning message:');
+  if(!msg)return;
+  try{
+    await apiFetch('/api/admin/bot/warn',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:id,message:msg})});
+    toast('Warning sent','success');
+  }catch(e){toast('Failed to send warning','error')}
 }
 
-function sendBroadcast() {
-  const message = document.getElementById('broadcastMsg').value;
-  const type = document.getElementById('broadcastType').value;
-  const scope = document.getElementById('broadcastTarget').value;
-  if(!message) return alert('Message empty');
-  if(!confirm('Transmit broadcast?')) return;
-  fetch('/api/admin/broadcast', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ message, type, scope })
-  }).then(res => res.json()).then(data => {
-    alert(`Sent to ${data.sentTo} sessions`);
-    document.getElementById('broadcastMsg').value = '';
-  });
+async function updateChannel(){
+  const link=document.getElementById('adm-channel').value;
+  try{
+    await apiFetch('/api/admin/global-settings/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({whatsappChannel:link})});
+    toast('Channel link saved','success');
+  }catch(e){toast('Failed to save','error')}
+}
+
+async function sendBroadcast(){
+  const msg=document.getElementById('bc-msg').value;
+  if(!msg){toast('Message is empty','error');return}
+  if(!confirm('Send broadcast to all?'))return;
+  try{
+    const data=await apiFetch('/api/admin/broadcast',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      message:msg,type:document.getElementById('bc-type').value,scope:document.getElementById('bc-target').value
+    })});
+    toast(`Broadcast sent to ${data.sentTo} sessions`,'success');
+    document.getElementById('bc-msg').value='';
+  }catch(e){toast('Broadcast failed','error')}
 }
 
 loadDashboard();
-setInterval(loadDashboard, 30000);
+setInterval(()=>{apiFetch('/api/stats').then(s=>{document.getElementById('s-uptime').textContent=s.uptime;document.getElementById('s-ram').textContent=s.ram}).catch(()=>{})},15000);
 </script>
-
 </body>
 </html>

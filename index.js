@@ -49,11 +49,23 @@ app.use(session({
 }));
 
 const isAuthenticated = (req, res, next) => {
-  return next();
+  if (req.session && req.session.loggedIn) {
+    return next();
+  }
+  if (req.path.startsWith('/api/')) {
+    return res.status(401).json({ success: false, message: 'Not authenticated' });
+  }
+  return res.redirect('/login');
 };
 
-app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'views/login.html')));
-app.get('/signup', (req, res) => res.sendFile(path.join(__dirname, 'views/signup.html')));
+app.get('/login', (req, res) => {
+  if (req.session && req.session.loggedIn) return res.redirect('/dashboard');
+  res.sendFile(path.join(__dirname, 'views/login.html'));
+});
+app.get('/signup', (req, res) => {
+  if (req.session && req.session.loggedIn) return res.redirect('/dashboard');
+  res.sendFile(path.join(__dirname, 'views/signup.html'));
+});
 
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
@@ -77,7 +89,13 @@ app.post('/api/auth/signup', async (req, res) => {
   }
 });
 
-app.get('/', isAuthenticated, (req, res) => res.sendFile(path.join(__dirname, 'views/dashboard.html')));
+app.get('/api/auth/logout', (req, res) => {
+  req.session.destroy();
+  res.json({ success: true });
+});
+
+app.get('/', (req, res) => res.redirect('/login'));
+app.get('/dashboard', isAuthenticated, (req, res) => res.sendFile(path.join(__dirname, 'views/dashboard.html')));
 
 app.get('/api/sessions', isAuthenticated, async (req, res) => {
   try {

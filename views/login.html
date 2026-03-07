@@ -1,43 +1,125 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Infinity MD | Login</title>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
-    <style>
-        :root { --neon-blue: #00f3ff; --neon-pink: #ff00ff; --dark-bg: #050505; }
-        body { background-color: var(--dark-bg); color: white; font-family: 'Rajdhani', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .login-card { background: rgba(20, 20, 20, 0.8); border: 1px solid var(--neon-blue); padding: 40px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,243,255,0.2); width: 300px; text-align: center; }
-        h2 { font-family: 'Orbitron'; color: var(--neon-blue); margin-bottom: 30px; }
-        input { background: #111; border: 1px solid var(--neon-blue); color: white; padding: 12px; width: 100%; margin-bottom: 20px; border-radius: 5px; box-sizing: border-box; }
-        .btn { background: var(--neon-blue); color: black; border: none; padding: 12px; width: 100%; cursor: pointer; font-family: 'Orbitron'; font-weight: bold; border-radius: 5px; transition: 0.3s; }
-        .btn:hover { background: var(--neon-pink); color: white; box-shadow: 0 0 15px var(--neon-pink); }
-        p { margin-top: 20px; font-size: 0.9rem; }
-        a { color: var(--neon-blue); text-decoration: none; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Infinity MD | Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      --bg:#030712;--surface:#111827;--surface-2:#1f2937;--border:#374151;
+      --cyan:#06b6d4;--cyan-glow:rgba(6,182,212,0.15);
+      --purple:#a855f7;--purple-glow:rgba(168,85,247,0.15);
+      --text:#f9fafb;--muted:#9ca3af;--danger:#ef4444;
+    }
+    body{
+      font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
+      min-height:100vh;display:flex;align-items:center;justify-content:center;
+      overflow:hidden;position:relative;
+    }
+    body::before{
+      content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;
+      background:radial-gradient(circle at 30% 30%,var(--cyan-glow),transparent 50%),
+                 radial-gradient(circle at 70% 70%,var(--purple-glow),transparent 50%);
+      animation:bgShift 20s ease-in-out infinite alternate;
+    }
+    @keyframes bgShift{0%{transform:translate(0,0)}100%{transform:translate(-5%,-5%)}}
+    .particles{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0}
+    .particle{position:absolute;width:2px;height:2px;background:var(--cyan);border-radius:50%;opacity:0.3;animation:float linear infinite}
+    @keyframes float{0%{transform:translateY(100vh) scale(0);opacity:0}10%{opacity:0.3}90%{opacity:0.3}100%{transform:translateY(-10vh) scale(1);opacity:0}}
+    .login-wrapper{position:relative;z-index:1;width:100%;max-width:420px;padding:20px}
+    .logo{text-align:center;margin-bottom:40px}
+    .logo h1{font-family:'Orbitron',sans-serif;font-size:2rem;background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:2px}
+    .logo p{color:var(--muted);font-size:0.85rem;margin-top:8px;letter-spacing:0.5px}
+    .card{
+      background:rgba(17,24,39,0.8);backdrop-filter:blur(20px);
+      border:1px solid var(--border);border-radius:20px;padding:40px;
+      box-shadow:0 25px 50px rgba(0,0,0,0.5);
+    }
+    .card h2{font-family:'Orbitron',sans-serif;font-size:1.1rem;color:var(--cyan);margin-bottom:8px;letter-spacing:1px}
+    .card .subtitle{color:var(--muted);font-size:0.85rem;margin-bottom:30px}
+    .input-group{position:relative;margin-bottom:20px}
+    .input-group label{display:block;font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;font-weight:600}
+    .input-group input{
+      width:100%;padding:14px 16px;background:var(--surface-2);border:1px solid var(--border);
+      border-radius:12px;color:var(--text);font-size:0.95rem;font-family:inherit;
+      transition:border-color 0.3s,box-shadow 0.3s;outline:none;
+    }
+    .input-group input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyan-glow)}
+    .input-group input::placeholder{color:#4b5563}
+    .error-msg{color:var(--danger);font-size:0.8rem;margin-bottom:16px;display:none;padding:10px;background:rgba(239,68,68,0.1);border-radius:8px;border:1px solid rgba(239,68,68,0.2)}
+    .btn{
+      width:100%;padding:14px;border:none;border-radius:12px;font-family:'Inter',sans-serif;
+      font-weight:600;font-size:0.95rem;cursor:pointer;transition:all 0.3s;
+      position:relative;overflow:hidden;
+    }
+    .btn-primary{
+      background:linear-gradient(135deg,var(--cyan),var(--purple));color:#fff;
+      box-shadow:0 4px 15px rgba(6,182,212,0.3);
+    }
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(6,182,212,0.4)}
+    .btn-primary:active{transform:translateY(0)}
+    .btn-primary:disabled{opacity:0.6;cursor:not-allowed;transform:none}
+    .btn .spinner{display:none;width:20px;height:20px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.6s linear infinite;margin:0 auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .divider{display:flex;align-items:center;gap:12px;margin:24px 0}
+    .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+    .divider span{color:var(--muted);font-size:0.75rem;text-transform:uppercase;letter-spacing:1px}
+    .footer-link{text-align:center;color:var(--muted);font-size:0.85rem}
+    .footer-link a{color:var(--cyan);text-decoration:none;font-weight:600;transition:color 0.3s}
+    .footer-link a:hover{color:var(--purple)}
+    .version{text-align:center;margin-top:30px;color:#374151;font-size:0.7rem;font-family:'Orbitron',sans-serif;letter-spacing:2px}
+  </style>
 </head>
 <body>
-    <div class="login-card">
-        <h2>LOGIN</h2>
-        <input type="text" id="username" placeholder="Username">
-        <input type="password" id="password" placeholder="Password">
-        <button class="btn" onclick="login()">ENTER SYSTEM</button>
-        <p>New here? <a href="/signup">Create account</a></p>
+  <div class="particles" id="particles"></div>
+  <div class="login-wrapper">
+    <div class="logo">
+      <h1>INFINITY MD</h1>
+      <p>WhatsApp Multi-Device Bot System</p>
     </div>
-    <script>
-        async function login() {
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const res = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
-            const data = await res.json();
-            if (data.success) location.href = '/';
-            else alert(data.message || 'Login failed');
-        }
-    </script>
+    <div class="card">
+      <h2>WELCOME BACK</h2>
+      <p class="subtitle">Sign in to access your dashboard</p>
+      <div class="error-msg" id="errorMsg"></div>
+      <div class="input-group">
+        <label>Username</label>
+        <input type="text" id="username" placeholder="Enter your username" autocomplete="username">
+      </div>
+      <div class="input-group">
+        <label>Password</label>
+        <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary" id="loginBtn" onclick="login()">
+        <span class="btn-text">Sign In</span>
+        <div class="spinner"></div>
+      </button>
+      <div class="divider"><span>or</span></div>
+      <p class="footer-link">Don't have an account? <a href="/signup">Create one</a></p>
+    </div>
+    <p class="version">v5.1.0</p>
+  </div>
+  <script>
+    (function(){const c=document.getElementById('particles');for(let i=0;i<30;i++){const p=document.createElement('div');p.className='particle';p.style.left=Math.random()*100+'%';p.style.animationDuration=(8+Math.random()*12)+'s';p.style.animationDelay=Math.random()*10+'s';p.style.width=p.style.height=(1+Math.random()*2)+'px';c.appendChild(p)}})();
+    document.getElementById('password').addEventListener('keydown',e=>{if(e.key==='Enter')login()});
+    document.getElementById('username').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('password').focus()});
+    async function login(){
+      const btn=document.getElementById('loginBtn');
+      const errEl=document.getElementById('errorMsg');
+      const u=document.getElementById('username').value.trim();
+      const p=document.getElementById('password').value;
+      errEl.style.display='none';
+      if(!u||!p){errEl.textContent='Please fill in all fields';errEl.style.display='block';return}
+      btn.disabled=true;btn.querySelector('.btn-text').style.display='none';btn.querySelector('.spinner').style.display='block';
+      try{
+        const res=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
+        const data=await res.json();
+        if(data.success){window.location.href='/dashboard'}
+        else{errEl.textContent=data.message||'Invalid username or password';errEl.style.display='block'}
+      }catch(e){errEl.textContent='Connection error. Please try again.';errEl.style.display='block'}
+      finally{btn.disabled=false;btn.querySelector('.btn-text').style.display='';btn.querySelector('.spinner').style.display='none'}
+    }
+  </script>
 </body>
 </html>
