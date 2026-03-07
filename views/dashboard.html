@@ -308,10 +308,49 @@ textarea{resize:vertical;min-height:80px}
 
       <!-- SETTINGS PAGE -->
       <div class="page" id="page-settings">
-        <div class="card" style="max-width:700px">
+
+        <!-- MY BOT SETTINGS (visible to all users) -->
+        <div class="card" style="max-width:700px;margin-bottom:24px">
           <div class="card-header">
-            <div class="card-title"><span class="dot" style="background:var(--cyan)"></span> Global Bot Settings</div>
+            <div class="card-title"><span class="dot" style="background:var(--cyan)"></span> My Bot Settings</div>
+            <span style="font-size:0.72rem;color:var(--dim);background:var(--surface-2);padding:4px 10px;border-radius:8px">Applies to all your bots</span>
           </div>
+          <p style="font-size:0.82rem;color:var(--dim);margin-bottom:16px">These settings apply to all bots you own. Per-bot overrides can be set in each bot's edit panel.</p>
+          <div class="toggle-row" style="margin-bottom:20px">
+            <label class="toggle-label"><input type="checkbox" id="u-antidelete"> Anti-Delete</label>
+            <label class="toggle-label"><input type="checkbox" id="u-autoReact"> Auto-React</label>
+            <label class="toggle-label"><input type="checkbox" id="u-autoStatus"> Auto-Status</label>
+            <label class="toggle-label"><input type="checkbox" id="u-antiviewonce"> Anti-ViewOnce</label>
+            <label class="toggle-label"><input type="checkbox" id="u-autoTyping"> Auto-Typing</label>
+            <label class="toggle-label"><input type="checkbox" id="u-autoVoice"> Auto-Voice</label>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
+            <div>
+              <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600">SRC Mode</label>
+              <select id="u-srcMode">
+                <option value="">Use Global Default</option>
+                <option value="private">Private (PIN Required)</option>
+                <option value="private_no_pin">Private (No PIN)</option>
+                <option value="public">Public (PIN Required)</option>
+                <option value="public_no_pin">Public (No PIN)</option>
+                <option value="disabled">Disabled</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600">SRC PIN</label>
+              <input type="text" id="u-srcPin" placeholder="Use global default" maxlength="6">
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="saveUserSettings()">Save My Settings</button>
+        </div>
+
+        <!-- GLOBAL SETTINGS (owner only) -->
+        <div class="card admin-card" style="max-width:700px" id="globalSettingsCard">
+          <div class="card-header">
+            <div class="card-title"><span class="dot" style="background:var(--purple)"></span> Global Settings (All Users)</div>
+            <span style="font-size:0.72rem;color:var(--purple);background:rgba(168,85,247,0.1);padding:4px 10px;border-radius:8px;border:1px solid rgba(168,85,247,0.2)">Owner Only</span>
+          </div>
+          <p style="font-size:0.82rem;color:var(--dim);margin-bottom:16px">These settings override all user and bot settings globally. Use with caution.</p>
           <div class="toggle-row" style="margin-bottom:20px">
             <label class="toggle-label"><input type="checkbox" id="g-maintenance"> Maintenance</label>
             <label class="toggle-label"><input type="checkbox" id="g-forceBot"> Force Bot</label>
@@ -336,7 +375,7 @@ textarea{resize:vertical;min-height:80px}
               <input type="text" id="g-srcPin" placeholder="0000" maxlength="6">
             </div>
           </div>
-          <button class="btn btn-primary" onclick="saveGlobalSettings()">Save Settings</button>
+          <button class="btn btn-primary" onclick="saveGlobalSettings()">Save Global Settings</button>
         </div>
       </div>
 
@@ -453,9 +492,23 @@ async function loadDashboard(){
     if(user.isOwner){
       document.getElementById('userRole').textContent='Owner';
       document.getElementById('nav-admin').style.display='';
+      document.getElementById('globalSettingsCard').style.display='';
     }else{
       document.getElementById('userRole').textContent='User';
+      document.getElementById('globalSettingsCard').style.display='none';
     }
+  }catch(e){}
+
+  try{
+    const uSettings=await apiFetch('/api/user-settings');
+    document.getElementById('u-antidelete').checked=uSettings.antidelete||false;
+    document.getElementById('u-autoReact').checked=uSettings.autoReact||false;
+    document.getElementById('u-autoStatus').checked=uSettings.autoStatus||false;
+    document.getElementById('u-antiviewonce').checked=uSettings.antiviewonce||false;
+    document.getElementById('u-autoTyping').checked=uSettings.autoTyping||false;
+    document.getElementById('u-autoVoice').checked=uSettings.autoVoice||false;
+    document.getElementById('u-srcMode').value=uSettings.srcMode||'';
+    document.getElementById('u-srcPin').value=uSettings.srcPin||'';
   }catch(e){}
 
   try{
@@ -619,6 +672,23 @@ async function updateSession(id){
     })});
     toast('Settings saved','success');renderSessions();
   }catch(e){toast('Update failed','error')}
+}
+
+async function saveUserSettings(){
+  const settings={
+    antidelete:document.getElementById('u-antidelete').checked,
+    autoReact:document.getElementById('u-autoReact').checked,
+    autoStatus:document.getElementById('u-autoStatus').checked,
+    antiviewonce:document.getElementById('u-antiviewonce').checked,
+    autoTyping:document.getElementById('u-autoTyping').checked,
+    autoVoice:document.getElementById('u-autoVoice').checked,
+    srcMode:document.getElementById('u-srcMode').value,
+    srcPin:document.getElementById('u-srcPin').value
+  };
+  try{
+    await apiFetch('/api/user-settings/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(settings)});
+    toast('Your bot settings saved','success');
+  }catch(e){toast('Failed to save settings','error')}
 }
 
 async function saveGlobalSettings(){

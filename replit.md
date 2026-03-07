@@ -46,10 +46,19 @@ module.exports = {
 - `node-webpmux` - Sticker EXIF metadata
 - `pino` - Logging
 
+## Two-Tier Settings System
+Settings merge in order of specificity (most specific wins):
+1. **Global Settings** (owner-only) — affects all bots across all users. Includes maintenance mode, force bot, etc.
+2. **User Settings** (per-user) — affects all bots owned by that user. Stored in `user_settings` table.
+3. **Session Settings** (per-bot) — affects a single bot instance. Set in bot edit panel.
+
+Merge chain in handler.js: `globalSettings → userSettings → sessionSettings`
+
 ## Web Dashboard
-- Port 3000 (mapped to external port 80)
-- Routes: `/login`, `/signup`, `/` (dashboard)
+- Port 5000 (default, configurable via PORT env var)
+- Routes: `/login`, `/signup`, `/dashboard`
 - API: `/api/sessions`, `/api/session/add|update|delete|restart`, `/api/admin/*`
+- Settings API: `/api/user-settings`, `/api/user-settings/update`, `/api/global-settings`, `/api/global-settings/update`
 
 ## Environment
 - Node.js 20 on NixOS

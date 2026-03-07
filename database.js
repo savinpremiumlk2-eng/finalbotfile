@@ -58,6 +58,11 @@ db.serialize(() => {
     userId TEXT PRIMARY KEY
   )`);
 
+  db.run(`CREATE TABLE IF NOT EXISTS user_settings (
+    username TEXT PRIMARY KEY,
+    settings TEXT DEFAULT '{}'
+  )`);
+
   // Initial global settings cache load
   db.all("SELECT * FROM global_settings", (err, rows) => {
     if (!err && rows) {
@@ -206,6 +211,21 @@ module.exports = {
   },
   deleteSession: async (id) => {
     return await run("DELETE FROM sessions WHERE id = ?", [id]);
+  },
+
+  // User Settings (per-user, applies to all their bots)
+  getUserSettings: async (username) => {
+    const rows = await query("SELECT settings FROM user_settings WHERE username = ?", [username]);
+    if (rows.length > 0) {
+      try { return JSON.parse(rows[0].settings); } catch (e) { return {}; }
+    }
+    return {};
+  },
+  updateUserSettings: async (username, settings) => {
+    const current = await module.exports.getUserSettings(username);
+    const updated = { ...current, ...settings };
+    await run("INSERT OR REPLACE INTO user_settings (username, settings) VALUES (?, ?)", [username, JSON.stringify(updated)]);
+    return updated;
   },
 
   // Deleted Messages (In-memory only for performance, as before)

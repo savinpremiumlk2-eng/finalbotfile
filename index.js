@@ -138,7 +138,8 @@ app.post('/api/session/update', isAuthenticated, async (req, res) => {
           botName: sessions[sessionId].name,
           ownerName: sessions[sessionId].ownerName,
           ownerNumber: sessions[sessionId].ownerNumber,
-          settings: sessions[sessionId].settings
+          settings: sessions[sessionId].settings,
+          userId: sessions[sessionId].userId
         };
       }
 
@@ -276,7 +277,8 @@ async function connectSession(id, sessionData) {
      botName: sessionData.name || 'Infinity MD',
      ownerName: sessionData.ownerName || config.ownerName[0],
      ownerNumber: sessionData.ownerNumber || config.ownerNumber[0],
-     settings: sessionData.settings || {}
+     settings: sessionData.settings || {},
+     userId: sessionData.userId
   };
 
   newSock.ev.on('creds.update', async () => {
@@ -380,6 +382,17 @@ app.get('/api/user-info', isAuthenticated, (req, res) => {
 
 app.get('/api/global-settings', isAuthenticated, async (req, res) => {
   res.json(await database.getGlobalSettings());
+});
+
+app.get('/api/user-settings', isAuthenticated, async (req, res) => {
+  const settings = await database.getUserSettings(req.session.username);
+  res.json(settings);
+});
+
+app.post('/api/user-settings/update', isAuthenticated, async (req, res) => {
+  const settings = req.body;
+  const updated = await database.updateUserSettings(req.session.username, settings);
+  res.json({ success: true, settings: updated });
 });
 
 app.post('/api/global-settings/update', isAuthenticated, async (req, res) => {
@@ -603,7 +616,7 @@ app.get('/api/stats', isAuthenticated, (req, res) => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log('Web server listening on', PORT));
 
 // Main Bot logic

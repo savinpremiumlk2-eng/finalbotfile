@@ -419,10 +419,16 @@ const handleMessage = async (sock, msg) => {
     const config = require('./config');
     const globalSettings = database.getGlobalSettingsSync();
     
-    // Merge global settings with session specific settings
+    // Merge settings: global → user → session (most specific wins)
+    const userId = sock._customConfig?.userId;
+    let userSettings = {};
+    if (userId) {
+      try { userSettings = await database.getUserSettings(userId); } catch(e) {}
+    }
     const sessionSettings = sock._customConfig?.settings || {};
     const effectiveSettings = {
       ...globalSettings,
+      ...userSettings,
       ...sessionSettings
     };
 
