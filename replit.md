@@ -55,7 +55,9 @@ Settings merge in order of specificity (most specific wins):
 Merge chain in handler.js: `globalSettings → userSettings → sessionSettings`
 
 ## Web Dashboard
-- Port 5000 (default, configurable via PORT env var)
+- Port 3000 (default), PORT=5000 set in dev workflow for Replit webview
+- Deployment: VM target (always-on), uses port 3000
+- Health endpoint: `/health` returns 200 OK
 - Routes: `/login`, `/signup`, `/dashboard`
 - API: `/api/sessions`, `/api/session/add|update|delete|restart`, `/api/admin/*`
 - Settings API: `/api/user-settings`, `/api/user-settings/update`, `/api/global-settings`, `/api/global-settings/update`

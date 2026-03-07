@@ -94,6 +94,7 @@ app.get('/api/auth/logout', (req, res) => {
   res.json({ success: true });
 });
 
+app.get('/health', (req, res) => res.status(200).send('OK'));
 app.get('/', (req, res) => res.redirect('/login'));
 app.get('/dashboard', isAuthenticated, (req, res) => res.sendFile(path.join(__dirname, 'views/dashboard.html')));
 
@@ -308,6 +309,7 @@ async function connectSession(id, sessionData) {
     const { connection, lastDisconnect } = update;
     if (connection === 'open') {
       activeSessions.set(id, newSock);
+      sessionData._retryCount = 0;
       console.log(`✅ Session ${id} connected!`);
     }
     if (connection === 'close') {
@@ -323,8 +325,17 @@ async function connectSession(id, sessionData) {
         activeSessions.delete(id);
         console.log(`❌ Session ${id} stopped (${isLoggedOut ? 'Logged out' : 'Deleted'})`);
       } else {
-        console.log(`🔄 Reconnecting session ${id} (Status: ${statusCode})...`);
-        setTimeout(() => connectSession(id, sessionData), 5000);
+        if (!sessionData._retryCount) sessionData._retryCount = 0;
+        sessionData._retryCount++;
+        const maxRetries = 5;
+        if (sessionData._retryCount > maxRetries) {
+          console.log(`⛔ Session ${id} exceeded max retries (${maxRetries}), stopping reconnect`);
+          activeSessions.delete(id);
+        } else {
+          const delay = Math.min(5000 * Math.pow(2, sessionData._retryCount - 1), 60000);
+          console.log(`🔄 Reconnecting session ${id} (Status: ${statusCode}, attempt ${sessionData._retryCount}/${maxRetries}, delay ${delay/1000}s)...`);
+          setTimeout(() => connectSession(id, sessionData), delay);
+        }
       }
     }
   });
@@ -616,7 +627,7 @@ app.get('/api/stats', isAuthenticated, (req, res) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log('Web server listening on', PORT));
 
 // Main Bot logic
