@@ -274,6 +274,95 @@ textarea{resize:vertical;min-height:80px}
           </div>
           <div id="quickSessions" class="grid-3"></div>
         </div>
+
+        <div class="card" style="margin-top:24px">
+          <div class="card-header">
+            <div class="card-title"><span class="dot" style="background:var(--cyan)"></span> User Manual / Guide</div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-sm" id="manualEnBtn" onclick="switchManual('en')" style="background:linear-gradient(135deg,var(--cyan),#0891b2);color:#fff;border:none">English</button>
+              <button class="btn btn-sm" id="manualSiBtn" onclick="switchManual('si')">Sinhala</button>
+            </div>
+          </div>
+
+          <div id="manual-en">
+            <div style="display:grid;gap:16px">
+              <div style="padding:16px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)">
+                <h3 style="font-size:0.9rem;color:var(--cyan);margin-bottom:10px">Getting Started</h3>
+                <ol style="font-size:0.82rem;color:var(--muted);line-height:2;padding-left:18px">
+                  <li>Go to <strong style="color:var(--text)">Deploy Bot</strong> from the sidebar</li>
+                  <li>Choose a connection method: <strong style="color:var(--text)">Session ID</strong>, <strong style="color:var(--text)">Pair Code</strong>, or <strong style="color:var(--text)">QR Code</strong></li>
+                  <li>Once connected, the bot will appear in <strong style="color:var(--text)">Bot Sessions</strong></li>
+                  <li>Customize behavior in <strong style="color:var(--text)">Settings</strong></li>
+                </ol>
+              </div>
+              <div style="padding:16px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)">
+                <h3 style="font-size:0.9rem;color:var(--cyan);margin-bottom:10px">Key Commands</h3>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.82rem">
+                  <div style="color:var(--muted)"><code style="color:var(--cyan)">.menu</code> - Main menu (reply with number)</div>
+                  <div style="color:var(--muted)"><code style="color:var(--cyan)">.settings</code> - View/change bot settings</div>
+                  <div style="color:var(--muted)"><code style="color:var(--cyan)">.mode</code> - Switch private/public mode</div>
+                  <div style="color:var(--muted)"><code style="color:var(--cyan)">.antiviewonce</code> - Anti view-once toggle</div>
+                  <div style="color:var(--muted)"><code style="color:var(--cyan)">.sticker</code> - Create stickers</div>
+                  <div style="color:var(--muted)"><code style="color:var(--cyan)">.song</code> - Download songs</div>
+                  <div style="color:var(--muted)"><code style="color:var(--cyan)">.ai</code> - AI chat</div>
+                  <div style="color:var(--muted)"><code style="color:var(--cyan)">.film2</code> - Search movies</div>
+                </div>
+              </div>
+              <div style="padding:16px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)">
+                <h3 style="font-size:0.9rem;color:var(--cyan);margin-bottom:10px">Connection Methods</h3>
+                <ul style="font-size:0.82rem;color:var(--muted);line-height:2;padding-left:18px">
+                  <li><strong style="color:var(--text)">Session ID</strong> - Paste a KnightBot session string</li>
+                  <li><strong style="color:var(--text)">Pair Code</strong> - Enter your phone number, get a code, enter it in WhatsApp > Linked Devices > Link with phone number</li>
+                  <li><strong style="color:var(--text)">QR Code</strong> - Scan from WhatsApp > Linked Devices > Link a Device</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div id="manual-si" style="display:none">
+            <div style="display:grid;gap:16px">
+              <div style="padding:16px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)">
+                <h3 style="font-size:0.9rem;color:var(--cyan);margin-bottom:10px">ආරම්භ කිරීම</h3>
+                <ol style="font-size:0.82rem;color:var(--muted);line-height:2;padding-left:18px">
+                  <li>Sidebar එකෙන් <strong style="color:var(--text)">Deploy Bot</strong> වෙත යන්න</li>
+                  <li>සම්බන්ධ කිරීමේ ක්‍රමයක් තෝරන්න: <strong style="color:var(--text)">Session ID</strong>, <strong style="color:var(--text)">Pair Code</strong>, හෝ <strong style="color:var(--text)">QR Code</strong></li>
+                  <li>සම්බන්ධ වූ පසු, බොට් එක <strong style="color:var(--text)">Bot Sessions</strong> හි පෙනෙනු ඇත</li>
+                  <li><strong style="color:var(--text)">Settings</strong> හි බොට් එකේ හැසිරීම් අභිරුචිකරණය කරන්න</li>
+                </ol>
+              </div>
+              <div style="padding:16px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)">
+                <h3 style="font-size:0.9rem;color:var(--cyan);margin-bottom:10px">ප්‍රධාන විධාන</h3>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.82rem">
+                  <div style="color:var(--muted)"><code style="color:var(--cyan)">.menu</code> - ප්‍රධාන මෙනුව (අංකයෙන් reply කරන්න)</div>
+                  <div style="color:var(--muted)"><code style="color:var(--cyan)">.settings</code> - බොට් සැකසුම් බලන්න/වෙනස් කරන්න</div>
+                  <div style="color:var(--muted)"><code style="color:var(--cyan)">.mode</code> - Private/Public මාදිලිය මාරු කරන්න</div>
+                  <div style="color:var(--muted)"><code style="color:var(--cyan)">.antiviewonce</code> - View-once ආරක්ෂාව on/off</div>
+                  <div style="color:var(--muted)"><code style="color:var(--cyan)">.sticker</code> - Sticker සාදන්න</div>
+                  <div style="color:var(--muted)"><code style="color:var(--cyan)">.song</code> - ගීත බාගන්න</div>
+                  <div style="color:var(--muted)"><code style="color:var(--cyan)">.ai</code> - AI Chat</div>
+                  <div style="color:var(--muted)"><code style="color:var(--cyan)">.film2</code> - චිත්‍රපට සොයන්න</div>
+                </div>
+              </div>
+              <div style="padding:16px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)">
+                <h3 style="font-size:0.9rem;color:var(--cyan);margin-bottom:10px">සම්බන්ධ කිරීමේ ක්‍රම</h3>
+                <ul style="font-size:0.82rem;color:var(--muted);line-height:2;padding-left:18px">
+                  <li><strong style="color:var(--text)">Session ID</strong> - KnightBot session string එකක් paste කරන්න</li>
+                  <li><strong style="color:var(--text)">Pair Code</strong> - දුරකථන අංකය ඇතුළත් කරන්න, code එකක් ලැබේ, WhatsApp > Linked Devices > Link with phone number වල ඇතුළත් කරන්න</li>
+                  <li><strong style="color:var(--text)">QR Code</strong> - WhatsApp > Linked Devices > Link a Device වලින් scan කරන්න</li>
+                </ul>
+              </div>
+              <div style="padding:16px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)">
+                <h3 style="font-size:0.9rem;color:var(--cyan);margin-bottom:10px">ඉඟි</h3>
+                <ul style="font-size:0.82rem;color:var(--muted);line-height:2;padding-left:18px">
+                  <li><code style="color:var(--cyan)">.menu</code> ටයිප් කළ පසු, submenu එකකට යාමට අංකයක් reply කරන්න</li>
+                  <li>Submenu එකේ command එකක් ක්‍රියාත්මක කිරීමට එහි අංකය reply කරන්න</li>
+                  <li>ආපසු main menu එකට යාමට <code style="color:var(--cyan)">0</code> reply කරන්න</li>
+                  <li>සියලු settings එකවර බැලීමට <code style="color:var(--cyan)">.settings</code> භාවිතා කරන්න</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- SESSIONS PAGE -->
@@ -741,6 +830,17 @@ async function addSession(){
     if(data.success){toast('Bot deployed successfully!','success');showPage('sessions',document.querySelectorAll('.nav-item')[1]);loadQuickSessions()}
     else toast('Error: '+(data.message||'Deploy failed'),'error');
   }catch(e){toast('Deploy failed','error')}
+}
+
+function switchManual(lang){
+  document.getElementById('manual-en').style.display=lang==='en'?'block':'none';
+  document.getElementById('manual-si').style.display=lang==='si'?'block':'none';
+  document.getElementById('manualEnBtn').style.background=lang==='en'?'linear-gradient(135deg,var(--cyan),#0891b2)':'';
+  document.getElementById('manualEnBtn').style.color=lang==='en'?'#fff':'';
+  document.getElementById('manualEnBtn').style.border=lang==='en'?'none':'';
+  document.getElementById('manualSiBtn').style.background=lang==='si'?'linear-gradient(135deg,var(--cyan),#0891b2)':'';
+  document.getElementById('manualSiBtn').style.color=lang==='si'?'#fff':'';
+  document.getElementById('manualSiBtn').style.border=lang==='si'?'none':'';
 }
 
 function switchDeployTab(tab,el){

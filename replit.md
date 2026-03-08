@@ -33,7 +33,7 @@ module.exports = {
 - **media/** - Downloaders (song, video, tiktok, instagram, facebook, lyrics, sinhanada)
 - **movie/** - Movie search/download (film2, movie)
 - **nsfw/** - NSFW content (restricted)
-- **owner/** - Bot owner commands (mode, block, restart, autopp, etc.)
+- **owner/** - Bot owner commands (mode, block, restart, autopp, settings, antiviewonce, etc.)
 - **utility/** - Tools (weather, translate, calc, wiki, shorten, remind, base64, wordcount)
 
 ## Key Dependencies
@@ -70,6 +70,13 @@ Three ways to connect a new bot, selectable via tabs:
 3. **QR Code** — Generate a QR code to scan from WhatsApp > Linked Devices > Link a Device
 
 All three methods auto-deploy the bot session after successful connection. Pair/QR sessions are stored with IDs prefixed `paired_` or `qr_` respectively. Temporary pairing sockets are tracked in `pairSessions` Map and cleaned up after connection or timeout.
+
+## Important Implementation Notes
+- **Menu number reply:** `_menuReply` must be exported AFTER `module.exports = {...}` in menu.js (CommonJS overwrites). The line `module.exports._menuReply = { resolveNumberReply };` must come after the main export object.
+- **Anti-ViewOnce:** Must check `msg.message` raw (before `getMessageContent()` unwraps it) since `getMessageContent()` strips viewOnce wrappers. Uses `downloadMediaMessage` to get the actual media buffer.
+- **Bot Mode (.mode):** Uses `database.updateGlobalSettings({ forceBot: true/false })` — NOT config.js file rewriting. Handler.js checks `globalSettings.forceBot`.
+- **.settings command:** Owner-only command showing all settings with quick toggle via `.settings <name> on/off`.
+- **Dashboard manual:** Overview page has EN/SI switchable user manual with getting started guide, key commands, and connection methods.
 
 ## Environment
 - Node.js 20 on NixOS

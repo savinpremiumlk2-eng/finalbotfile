@@ -59,11 +59,6 @@ function resolveNumberReply(chatId, sender, text) {
   return cmd;
 }
 
-// Expose to main handler
-module.exports._menuReply = {
-  resolveNumberReply,
-};
-
 // -------------------- Helpers --------------------
 function formatUptime(sec) {
   const h = Math.floor(sec / 3600);
@@ -325,3 +320,5 @@ module.exports = {
     return sock.sendMessage(chatId, { text: submenuText, mentions: [sender] }, { quoted: msg });
   }
 };
+
+module.exports._menuReply = { resolveNumberReply };

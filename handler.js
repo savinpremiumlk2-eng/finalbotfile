@@ -10,6 +10,7 @@ const { jidDecode, jidEncode } = require('@whiskeysockets/baileys');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
+const pino = require('pino');
 
 const menuModule = require('./commands/general/menu');
 let ytModule;
@@ -501,17 +502,33 @@ const handleMessage = async (sock, msg) => {
     }
     
     // Anti-ViewOnce System
-    if (effectiveSettings.antiviewonce && content) {
-      const type = Object.keys(content)[0];
-      if (type === 'viewOnceMessageV2' || type === 'viewOnceMessage') {
-        const viewOnce = content[type].message;
-        const msgType = Object.keys(viewOnce)[0];
-        const media = viewOnce[msgType];
-        
-        await sock.sendMessage(from, {
-          [msgType.replace('Message', '')]: media,
-          caption: `🛡️ *Anti-ViewOnce Detected*\n\n${media.caption || ''}`
-        }, { quoted: msg }).catch(() => {});
+    if (effectiveSettings.antiviewonce && msg.message && !msg.key.fromMe) {
+      let rawMsg = msg.message;
+      if (rawMsg.ephemeralMessage) rawMsg = rawMsg.ephemeralMessage.message;
+      const voType = rawMsg.viewOnceMessageV2 ? 'viewOnceMessageV2' : rawMsg.viewOnceMessage ? 'viewOnceMessage' : null;
+      if (voType) {
+        try {
+          const viewOnce = rawMsg[voType].message;
+          const mediaType = Object.keys(viewOnce).find(k => k !== 'messageContextInfo');
+          if (mediaType) {
+            const media = viewOnce[mediaType];
+            const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+            const buffer = await downloadMediaMessage(
+              { key: msg.key, message: rawMsg[voType].message },
+              'buffer',
+              {},
+              { logger: pino({ level: 'silent' }), reuploadRequest: sock.updateMediaMessage }
+            );
+            const sendType = mediaType.replace('Message', '');
+            const sendObj = { [sendType]: buffer };
+            if (media.caption) sendObj.caption = `🛡️ *Anti-ViewOnce*\n\n${media.caption}`;
+            else sendObj.caption = '🛡️ *Anti-ViewOnce Detected*';
+            if (media.mimetype) sendObj.mimetype = media.mimetype;
+            await sock.sendMessage(from, sendObj, { quoted: msg }).catch(() => {});
+          }
+        } catch (voErr) {
+          console.error('Anti-ViewOnce error:', voErr.message);
+        }
       }
     }
 

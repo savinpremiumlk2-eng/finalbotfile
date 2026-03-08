@@ -1,11 +1,5 @@
-/**
- * Mode Command
- * Toggle bot between private and public mode
- */
-
 const config = require('../../config');
-const fs = require('fs');
-const path = require('path');
+const database = require('../../database');
 
 module.exports = {
   name: 'mode',
@@ -17,15 +11,18 @@ module.exports = {
   
   async execute(sock, msg, args, extra) {
     try {
+      const globalSettings = database.getGlobalSettingsSync();
+      const currentMode = globalSettings.forceBot ? 'private' : 'public';
+
       if (!args[0]) {
-        const currentMode = config.selfMode ? 'private' : 'public';
-        const description = config.selfMode 
-          ? 'Only owner and sudo users can use commands'
+        const modeEmoji = globalSettings.forceBot ? '🔒' : '🌐';
+        const description = globalSettings.forceBot 
+          ? 'Only owner can use commands'
           : 'Everyone can use commands';
         
         return extra.reply(
           `🤖 *Bot Mode*\n\n` +
-          `Current Mode: *${currentMode.toUpperCase()}*\n` +
+          `${modeEmoji} Current Mode: *${currentMode.toUpperCase()}*\n` +
           `Status: ${description}\n\n` +
           `Usage:\n` +
           `  .mode private - Only owner can use\n` +
@@ -36,24 +33,20 @@ module.exports = {
       const mode = args[0].toLowerCase();
       
       if (mode === 'private' || mode === 'priv') {
-        if (config.selfMode) {
+        if (globalSettings.forceBot) {
           return extra.reply('🔒 Bot is already in *PRIVATE* mode.\nOnly owner can use commands.');
         }
         
-        // Update config
-        updateConfig('selfMode', true);
-        config.selfMode = true; // Update runtime config
+        await database.updateGlobalSettings({ forceBot: true });
         return extra.reply('🔒 Bot mode changed to *PRIVATE*\n\nOnly owner can use commands now.');
       }
       
       if (mode === 'public' || mode === 'pub') {
-        if (!config.selfMode) {
+        if (!globalSettings.forceBot) {
           return extra.reply('🌐 Bot is already in *PUBLIC* mode.\nEveryone can use commands.');
         }
         
-        // Update config
-        updateConfig('selfMode', false);
-        config.selfMode = false; // Update runtime config
+        await database.updateGlobalSettings({ forceBot: false });
         return extra.reply('🌐 Bot mode changed to *PUBLIC*\n\nEveryone can use commands now.');
       }
       
@@ -65,22 +58,3 @@ module.exports = {
     }
   }
 };
-
-function updateConfig(key, value) {
-  try {
-    const configPath = path.join(__dirname, '..', '..', 'config.js');
-    let configContent = fs.readFileSync(configPath, 'utf8');
-    
-    // Update the value
-    const regex = new RegExp(`(${key}:\\s*)(true|false)`, 'g');
-    configContent = configContent.replace(regex, `$1${value}`);
-    
-    fs.writeFileSync(configPath, configContent, 'utf8');
-    
-    // Reload config
-    delete require.cache[require.resolve('../../config')];
-  } catch (error) {
-    console.error('Error saving config:', error);
-  }
-}
-
