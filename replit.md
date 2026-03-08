@@ -15,7 +15,7 @@ WhatsApp MD bot built with Baileys (multi-device), Express web dashboard, and SQ
 - **Entry point:** `index.js` - Express server + Baileys WhatsApp connection manager
 - **Config:** `config.js` - Global bot settings (prefix, owner, behavior toggles)
 - **Settings:** `settings.js` - Additional settings
-- **Database:** `database.js` - SQLite wrapper (`database/bot.db`)
+- **Database:** `database.js` - better-sqlite3 wrapper (`database/bot.db`)
 - **Handler:** `handler.js` - Message routing, command parsing, anti-spam/antilink/welcome systems
 - **Command loader:** `utils/commandLoader.js` - Auto-loads all `.js` files from `commands/` subdirectories
 
@@ -47,7 +47,7 @@ module.exports = {
 ## Key Dependencies
 - `@whiskeysockets/baileys` - WhatsApp Web API
 - `express` + `express-session` - Web dashboard
-- `sqlite3` - Database
+- `better-sqlite3` - Database (synchronous SQLite)
 - `sharp`, `canvas`, `jimp` - Image processing
 - `ffmpeg-static`, `fluent-ffmpeg` - Media conversion
 - `axios`, `cheerio` - HTTP/scraping
