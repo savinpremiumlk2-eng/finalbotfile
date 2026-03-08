@@ -37,6 +37,18 @@ const logger = pino({ level: 'silent' });
 const activeSessions = new Map();
 const sessionsDbPath = path.join(__dirname, 'database', 'sessions.json');
 
+app.get('/health', (req, res) => res.status(200).send('OK'));
+app.get('/', (req, res) => {
+  const ua = (req.headers['user-agent'] || '').toLowerCase();
+  if (!ua || !ua.includes('mozilla')) {
+    return res.status(200).send('OK');
+  }
+  return res.redirect('/login');
+});
+
+const PORT = process.env.PORT || 3000;
+const server = app.listen(PORT, '0.0.0.0', () => console.log('Web server listening on', PORT));
+
 // Ensure session directory exists
 if (!fs.existsSync(path.join(__dirname, 'session'))) {
   fs.mkdirSync(path.join(__dirname, 'session'), { recursive: true });
@@ -56,15 +68,6 @@ const { startCleanup } = require('./utils/cleanup');
 // Initialize system
 initializeTempSystem();
 startCleanup();
-
-app.get('/health', (req, res) => res.status(200).send('OK'));
-app.get('/', (req, res) => {
-  const ua = (req.headers['user-agent'] || '').toLowerCase();
-  if (!ua || !ua.includes('mozilla')) {
-    return res.status(200).send('OK');
-  }
-  return res.redirect('/login');
-});
 
 app.use(express.json());
 app.use(session({
@@ -904,9 +907,6 @@ app.get('/api/stats', isAuthenticated, (req, res) => {
     ram: (process.memoryUsage().rss / 1024 / 1024).toFixed(2)
   });
 });
-
-const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, '0.0.0.0', () => console.log('Web server listening on', PORT));
 
 setInterval(() => {
   const http = require('http');
