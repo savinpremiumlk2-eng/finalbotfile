@@ -247,7 +247,7 @@ module.exports = {
       case 'toolmenu':            category = 'utility';       title = '🛠 TOOLS MENU'; break;
       case 'entertainmentmenu':   category = 'entertainment'; title = '👾 ENTERTAINMENT MENU'; break;
       case 'textmenu':            category = 'textmaker';     title = '✍️ TEXT MENU'; break;
-      case 'moviemenu':           category = 'movies';        title = '🎬 MOVIE MENU'; break;
+      case 'moviemenu':           category = 'movie';         title = '🎬 MOVIE MENU'; break;
       case 'generalmenu':         category = 'general';       title = '🧭 GENERAL MENU'; break;
 
       // ".menu admin"
@@ -259,7 +259,7 @@ module.exports = {
       case 'utility':             category = 'utility';       title = '🛠 TOOLS MENU'; break;
       case 'entertainment':       category = 'entertainment'; title = '👾 ENTERTAINMENT MENU'; break;
       case 'textmaker':           category = 'textmaker';     title = '✍️ TEXT MENU'; break;
-      case 'movies':              category = 'movies';        title = '🎬 MOVIE MENU'; break;
+      case 'movies': case 'movie': category = 'movie';         title = '🎬 MOVIE MENU'; break;
       case 'general':             category = 'general';       title = '🧭 GENERAL MENU'; break;
 
       // back-compat

@@ -635,9 +635,6 @@ setInterval(() => {
   http.get(`http://127.0.0.1:${PORT}/health`, () => {}).on('error', () => {});
 }, 4 * 60 * 1000);
 
-process.on('SIGTERM', () => {
-  console.log('⚠️ Received SIGTERM, keeping alive...');
-});
 process.on('SIGINT', () => {
   console.log('⚠️ Received SIGINT, shutting down gracefully...');
   server.close(() => process.exit(0));

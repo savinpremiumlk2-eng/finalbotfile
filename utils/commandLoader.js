@@ -5,8 +5,16 @@
 const fs = require('fs');
 const path = require('path');
 
-// Load all commands
-const loadCommands = () => {
+let _cachedCommands = null;
+let _cacheTime = 0;
+const CACHE_TTL = 60000;
+
+const loadCommands = (forceReload = false) => {
+  const now = Date.now();
+  if (!forceReload && _cachedCommands && (now - _cacheTime < CACHE_TTL)) {
+    return _cachedCommands;
+  }
+
   const commands = new Map();
   const commandsPath = path.join(__dirname, '..', 'commands');
   
@@ -25,11 +33,11 @@ const loadCommands = () => {
       files.forEach(file => {
         const fullPath = path.join(categoryPath, file);
         try {
-          // Clear cache for hot-reloading new plugins
-          delete require.cache[require.resolve(fullPath)];
+          if (forceReload) {
+            delete require.cache[require.resolve(fullPath)];
+          }
           const commandModule = require(fullPath);
           
-          // Support both module.exports = { ... } and cmd({ ... }) styles
           const { commands: cmdRegistry } = require('../command');
           
           let command = commandModule;
@@ -45,7 +53,6 @@ const loadCommands = () => {
             }
           }
           
-          // Also load anything registered via cmd() in that file
           cmdRegistry.forEach((cmdObj, name) => {
             commands.set(name, cmdObj);
           });
@@ -57,8 +64,9 @@ const loadCommands = () => {
     }
   });
   
+  _cachedCommands = commands;
+  _cacheTime = now;
   return commands;
 };
 
 module.exports = { loadCommands };
-

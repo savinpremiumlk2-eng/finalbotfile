@@ -45,7 +45,7 @@ module.exports = {
     const seen = new Set();
     const bucket = {
       general: [], ai: [], admin: [], owner: [], media: [],
-      fun: [], utility: [], entertainment: [], textmaker: [], movies: [], other: []
+      fun: [], utility: [], entertainment: [], textmaker: [], movie: [], other: []
     };
 
     for (const cmd of cmdList) {
@@ -88,7 +88,7 @@ module.exports = {
     text += buildSection('🔧 UTILITY COMMAND', bucket.utility, prefix);
     text += buildSection('👾 ENTERTAINMENT COMMAND', bucket.entertainment, prefix);
     text += buildSection('🖋️ TEXTMAKER COMMAND', bucket.textmaker, prefix);
-    text += buildSection('🎬 MOVIES COMMAND', bucket.movies, prefix);
+    text += buildSection('🎬 MOVIE COMMAND', bucket.movie, prefix);
     if (bucket.other.length) text += buildSection('🧪 OTHER COMMAND', bucket.other, prefix);
 
     text += `╰━━━━━━━━━━━━━━━━━\n\n💡 Type ${prefix}help <command> for more info`;

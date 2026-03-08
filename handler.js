@@ -11,9 +11,19 @@ const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 
+const menuModule = require('./commands/general/menu');
+let ytModule;
+try { ytModule = require('./commands/media/yt'); } catch(e) { ytModule = null; }
+let film2Module;
+try { film2Module = require('./commands/movies/film2'); } catch(e) {
+  try { film2Module = require('./commands/movie/film2'); } catch(e2) { film2Module = null; }
+}
+let storeModule;
+try { storeModule = require('./lib/lightweight_store'); } catch(e) { storeModule = null; }
+
 // Group metadata cache to prevent rate limiting
 const groupMetadataCache = new Map();
-const CACHE_TTL = 60000; // 1 minute cache
+const CACHE_TTL = 300000; // 5 minute cache
 
 // Load all commands
 const { commands: cmdRegistry } = require('./command');
@@ -127,15 +137,16 @@ const getLiveGroupMetadata = async (sock, groupId) => {
 // Alias for backward compatibility (non-admin features use cached)
 const getGroupMetadata = getCachedGroupMetadata;
 
-// Helper functions
+let _sessionsCache = null;
+let _sessionsCacheTime = 0;
+const SESSIONS_CACHE_TTL = 30000;
+
 const isOwner = (sender, currentSock = null) => {
   if (!sender) return false;
   
-  // Normalize sender JID to handle LID
   const normalizedSender = normalizeJidWithLid(sender);
   const senderNumber = normalizeJid(normalizedSender);
   
-  // Check if we have a custom session config for this socket
   if (currentSock && currentSock._customConfig) {
      const ownerNum = currentSock._customConfig.ownerNumber;
      if (ownerNum) {
@@ -144,7 +155,6 @@ const isOwner = (sender, currentSock = null) => {
      }
   }
 
-  // Check against global owner numbers
   const globalOwners = config.ownerNumber.some(owner => {
     const normalizedOwner = normalizeJidWithLid(owner.includes('@') ? owner : `${owner}@s.whatsapp.net`);
     const ownerNumber = normalizeJid(normalizedOwner);
@@ -153,10 +163,13 @@ const isOwner = (sender, currentSock = null) => {
 
   if (globalOwners) return true;
 
-  // Check against all session owners in DB
   try {
-    const sessions = JSON.parse(fs.readFileSync(path.join(__dirname, 'database', 'sessions.json'), 'utf-8'));
-    return Object.values(sessions).some(s => normalizeJid(s.ownerNumber) === senderNumber);
+    const now = Date.now();
+    if (!_sessionsCache || now - _sessionsCacheTime > SESSIONS_CACHE_TTL) {
+      _sessionsCache = JSON.parse(fs.readFileSync(path.join(__dirname, 'database', 'sessions.json'), 'utf-8'));
+      _sessionsCacheTime = now;
+    }
+    return Object.values(_sessionsCache).some(s => normalizeJid(s.ownerNumber) === senderNumber);
   } catch (e) {
     return false;
   }
@@ -316,26 +329,15 @@ const findParticipant = (participants = [], userIds) => {
 
 const isAdmin = async (sock, participant, groupId, groupMetadata = null) => {
   if (!participant) return false;
+  if (!groupId || !groupId.endsWith('@g.us')) return false;
   
-  // Early return for non-group JIDs (DMs) - prevents slow sock.groupMetadata() call
-  if (!groupId || !groupId.endsWith('@g.us')) {
-    return false;
+  let metadata = groupMetadata;
+  if (!metadata || !metadata.participants) {
+    metadata = await getCachedGroupMetadata(sock, groupId);
   }
+  if (!metadata || !metadata.participants) return false;
   
-  // Always fetch live metadata for admin checks
-  let liveMetadata = groupMetadata;
-  if (!liveMetadata || !liveMetadata.participants) {
-    if (groupId) {
-      liveMetadata = await getLiveGroupMetadata(sock, groupId);
-    } else {
-      return false;
-    }
-  }
-  
-  if (!liveMetadata || !liveMetadata.participants) return false;
-  
-  // Use findParticipant to handle LID matching
-  const foundParticipant = findParticipant(liveMetadata.participants, participant);
+  const foundParticipant = findParticipant(metadata.participants, participant);
   if (!foundParticipant) return false;
   
   return foundParticipant.admin === 'admin' || foundParticipant.admin === 'superadmin';
@@ -343,31 +345,23 @@ const isAdmin = async (sock, participant, groupId, groupMetadata = null) => {
 
 const isBotAdmin = async (sock, groupId, groupMetadata = null) => {
   if (!sock.user || !groupId) return false;
-  
-  // Early return for non-group JIDs (DMs) - prevents slow sock.groupMetadata() call
-  if (!groupId.endsWith('@g.us')) {
-    return false;
-  }
+  if (!groupId.endsWith('@g.us')) return false;
   
   try {
-    // Get bot's JID - Baileys stores it in sock.user.id
     const botId = sock.user.id;
     const botLid = sock.user.lid;
-    
     if (!botId) return false;
     
-    // Prepare bot JIDs to check - findParticipant will normalize them via buildComparableIds
     const botJids = [botId];
-    if (botLid) {
-      botJids.push(botLid);
+    if (botLid) botJids.push(botLid);
+    
+    let metadata = groupMetadata;
+    if (!metadata || !metadata.participants) {
+      metadata = await getCachedGroupMetadata(sock, groupId);
     }
+    if (!metadata || !metadata.participants) return false;
     
-    // ALWAYS fetch live metadata for bot admin checks (never use cached)
-    const liveMetadata = await getLiveGroupMetadata(sock, groupId);
-    
-    if (!liveMetadata || !liveMetadata.participants) return false;
-    
-    const participant = findParticipant(liveMetadata.participants, botJids);
+    const participant = findParticipant(metadata.participants, botJids);
     if (!participant) return false;
     
     return participant.admin === 'admin' || participant.admin === 'superadmin';
@@ -414,21 +408,10 @@ const handleMessage = async (sock, msg) => {
 
     if (isSystemJid(from)) return;
     
-    // Clear cache to get fresh config values
-    delete require.cache[require.resolve('./config')];
-    const config = require('./config');
     const globalSettings = database.getGlobalSettingsSync();
-    
-    // Merge settings: global → user → session (most specific wins)
-    const userId = sock._customConfig?.userId;
-    let userSettings = {};
-    if (userId) {
-      try { userSettings = await database.getUserSettings(userId); } catch(e) {}
-    }
     const sessionSettings = sock._customConfig?.settings || {};
     const effectiveSettings = {
       ...globalSettings,
-      ...userSettings,
       ...sessionSettings
     };
 
@@ -439,15 +422,12 @@ const handleMessage = async (sock, msg) => {
       return;
     }
 
-    // Auto-Typing & Auto-Voice System
-    try {
-      if (effectiveSettings.autoTyping || config.autoTyping) {
-        await sock.sendPresenceUpdate('composing', from).catch(() => {});
-      }
-      if (effectiveSettings.autoVoice || config.autoVoice) {
-        await sock.sendPresenceUpdate('recording', from).catch(() => {});
-      }
-    } catch (e) {}
+    // Auto-Typing & Auto-Voice System (fire-and-forget, don't block)
+    if (effectiveSettings.autoTyping || config.autoTyping) {
+      sock.sendPresenceUpdate('composing', from).catch(() => {});
+    } else if (effectiveSettings.autoVoice || config.autoVoice) {
+      sock.sendPresenceUpdate('recording', from).catch(() => {});
+    }
 
     // Auto-React System
     try {
@@ -463,14 +443,10 @@ const handleMessage = async (sock, msg) => {
         const isCmd = text && prefixList.includes(text.trim()[0]);
 
         if (isCmd) {
-          await sock.sendMessage(jid, { react: { text: '⏳', key: msg.key } }).catch(() => {});
-        }
-
-        if (autoReactMode === 'all' || (autoReactMode === 'bot' && isCmd)) {
-           if (autoReactMode === 'all' && !isCmd) {
-             const rand = emojis[Math.floor(Math.random() * emojis.length)];
-             await sock.sendMessage(jid, { react: { text: rand, key: msg.key } }).catch(() => {});
-           }
+          sock.sendMessage(jid, { react: { text: '⏳', key: msg.key } }).catch(() => {});
+        } else if (autoReactMode === 'all') {
+          const rand = emojis[Math.floor(Math.random() * emojis.length)];
+          sock.sendMessage(jid, { react: { text: rand, key: msg.key } }).catch(() => {});
         }
       }
     } catch (e) {}
@@ -551,15 +527,11 @@ const handleMessage = async (sock, msg) => {
 
     // Numeric Replies (Consolidated)
     try {
-      const menuModule = require('./commands/general/menu');
       const resolvedMenuCmd = (menuModule && menuModule._menuReply) ? menuModule._menuReply.resolveNumberReply(from, sender, body) : null;
       
       if (resolvedMenuCmd) {
         body = resolvedMenuCmd;
-        // If it was a menu command, we reset it to the resolved command and let the parser handle it.
       } else if (/^\d+$/.test(body)) {
-        // Only check film2 if it wasn't a menu reply
-        const film2Module = require('./commands/movies/film2');
         if (film2Module) {
            const command = commands.get('film2') || cmdRegistry.get('film2');
            if (command) {
@@ -573,35 +545,31 @@ const handleMessage = async (sock, msg) => {
         }
       }
 
-      const ytModule = require('./commands/media/yt');
       if (ytModule && ytModule._ytReply) {
         const resolvedYt = ytModule._ytReply.resolveNumberReply(from, sender, body);
         if (resolvedYt) body = resolvedYt;
       }
 
-      // Check for numerical replies to film commands (SriHub/Cinesubz)
-      if (isGroup && content.extendedTextMessage?.contextInfo?.stanzaId) {
+      if (storeModule && content.extendedTextMessage?.contextInfo?.stanzaId) {
         const stanzaId = content.extendedTextMessage.contextInfo.stanzaId;
         const choice = parseInt(body);
         if (!isNaN(choice)) {
-          const store = require('./lib/lightweight_store');
           const sriKey = `srihub_${from}_${sender}`;
           const cineKey = `cinesubz_${from}_${sender}`;
-          let session = await store.getSetting('sessions', sriKey);
+          let session = await storeModule.getSetting('sessions', sriKey);
           let type = 'srihub';
           if (!session || session.msgId !== stanzaId) {
-            session = await store.getSetting('sessions', cineKey);
+            session = await storeModule.getSetting('sessions', cineKey);
             type = 'cinesubz';
           }
           if (session && session.msgId === stanzaId && (Date.now() - session.timestamp < 600000)) {
             const url = session.results[choice - 1];
             if (url) {
-              await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } }).catch(() => {});
+              sock.sendMessage(from, { react: { text: '⏳', key: msg.key } }).catch(() => {});
               await sock.sendMessage(from, { text: `📥 Fetching file for: ${url}\nThis may take a moment...` }, { quoted: msg }).catch(() => {});
               const apiKey = type === 'srihub' ? 'dew_kuKmHwBBCgIAdUty5TBY1VWWtUgwbQwKRtC8MFUF' : 'dew_FEIXBd8x3XE6eshtBtM1NwEV5IxSLI6PeRE2zLmi';
               const dlEndpoint = type === 'srihub' ? 'https://api.srihub.store/movie/srihubdl' : 'https://api.srihub.store/movie/cinesubzdl';
               try {
-                const axios = require('axios');
                 const dlRes = await axios.get(`${dlEndpoint}?url=${encodeURIComponent(url)}&apikey=${apiKey}`);
                 const movie = dlRes.data?.result;
                 const link = movie?.downloadOptions?.[0]?.links?.[0]?.url || movie?.links?.[0]?.url;
@@ -644,14 +612,18 @@ const handleMessage = async (sock, msg) => {
         }
 
         try {
-          await sock.sendMessage(from, { react: { text: '⏳', key: msg.key } }).catch(() => {});
+          sock.sendMessage(from, { react: { text: '⏳', key: msg.key } }).catch(() => {});
           const executeFn = command.handler || command.execute;
           if (executeFn) {
+            const [adminResult, botAdminResult] = await Promise.all([
+              isAdmin(sock, sender, from, groupMetadata),
+              isBotAdmin(sock, from, groupMetadata)
+            ]);
             await executeFn(sock, msg, args, {
               from, sender, isGroup, groupMetadata,
               isOwner: isOwner(sender, sock),
-              isAdmin: await isAdmin(sock, sender, from, groupMetadata),
-              isBotAdmin: await isBotAdmin(sock, from, groupMetadata),
+              isAdmin: adminResult,
+              isBotAdmin: botAdminResult,
               isMod: isMod(sender),
               commandName,
               reply: (text) => sock.sendMessage(from, { text }, { quoted: msg }).catch(() => {}),
