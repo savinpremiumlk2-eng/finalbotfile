@@ -37,49 +37,12 @@ const logger = pino({ level: 'silent' });
 const activeSessions = new Map();
 const sessionsDbPath = path.join(__dirname, 'database', 'sessions.json');
 let serverReady = false;
-
-app.get('/', (req, res) => {
-  res.status(200).send('<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=/login"><title>Infinity MD</title></head><body>OK</body></html>');
-});
-
-// Ensure session directory exists
-if (!fs.existsSync(path.join(__dirname, 'session'))) {
-  fs.mkdirSync(path.join(__dirname, 'session'), { recursive: true });
-}
-
-// ✅ Load config/settings with error protection
-let config, handler, database, auth;
 const session = require('express-session');
 
-try {
-  require('./config');
-  require('./settings');
-  config = require('./config');
-  handler = require('./handler');
-  database = require('./database');
-  auth = require('./utils/auth');
-  const { initializeTempSystem } = require('./utils/tempManager');
-  const { startCleanup } = require('./utils/cleanup');
-  initializeTempSystem();
-  startCleanup();
-  console.log('✅ All modules loaded successfully');
-} catch (e) {
-  console.error('❌ Critical module loading error:', e);
-  if (!config) config = require('./config');
-  if (!database) {
-    try { database = require('./database'); } catch (_) {
-      console.error('❌ Database module failed to load');
-    }
-  }
-  if (!auth) {
-    try { auth = require('./utils/auth'); } catch (_) {
-      console.error('❌ Auth module failed to load');
-    }
-  }
-  if (!handler) {
-    console.error('❌ Handler module failed to load - bot commands will not work');
-  }
-}
+app.get('/', (req, res) => {
+  if (!serverReady) return res.status(200).send('OK');
+  res.status(200).send('<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=/login"><title>Infinity MD</title></head><body>OK</body></html>');
+});
 
 app.use(express.json());
 app.use(session({
@@ -91,11 +54,57 @@ app.use(session({
 
 const PORT = process.env.PORT || 3000;
 const server = app.listen(PORT, '0.0.0.0', () => {
-  serverReady = true;
   console.log('✅ Web server listening on', PORT);
+
+  setTimeout(() => {
+    if (!fs.existsSync(path.join(__dirname, 'session'))) {
+      fs.mkdirSync(path.join(__dirname, 'session'), { recursive: true });
+    }
+
+    try {
+      require('./config');
+      require('./settings');
+      config = require('./config');
+      handler = require('./handler');
+      database = require('./database');
+      auth = require('./utils/auth');
+      const { initializeTempSystem } = require('./utils/tempManager');
+      const { startCleanup } = require('./utils/cleanup');
+      initializeTempSystem();
+      startCleanup();
+      console.log('✅ All modules loaded successfully');
+    } catch (e) {
+      console.error('❌ Critical module loading error:', e);
+      if (!config) config = require('./config');
+      if (!database) {
+        try { database = require('./database'); } catch (_) {
+          console.error('❌ Database module failed to load');
+        }
+      }
+      if (!auth) {
+        try { auth = require('./utils/auth'); } catch (_) {
+          console.error('❌ Auth module failed to load');
+        }
+      }
+      if (!handler) {
+        console.error('❌ Handler module failed to load - bot commands will not work');
+      }
+    }
+
+    serverReady = true;
+    initSessions();
+  }, 0);
 });
 
+let config, handler, database, auth;
+
 const isAuthenticated = (req, res, next) => {
+  if (!serverReady) {
+    if (req.path.startsWith('/api/')) {
+      return res.status(503).json({ success: false, message: 'Server is starting up, please wait...' });
+    }
+    return res.status(200).send('<!DOCTYPE html><html><head><meta http-equiv="refresh" content="3"><title>Starting...</title></head><body>Server is starting up, please wait...</body></html>');
+  }
   if (req.session && req.session.loggedIn) {
     return next();
   }
@@ -115,6 +124,7 @@ app.get('/signup', (req, res) => {
 });
 
 app.post('/api/auth/login', async (req, res) => {
+  if (!serverReady || !auth) return res.status(503).json({ success: false, message: 'Server is starting up, please wait...' });
   const { username, password } = req.body;
   const authResult = await auth.login(username, password);
   if (authResult) {
@@ -128,6 +138,7 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 app.post('/api/auth/signup', async (req, res) => {
+  if (!serverReady || !auth) return res.status(503).json({ success: false, message: 'Server is starting up, please wait...' });
   const { username, password } = req.body;
   if (await auth.register(username, password)) {
     res.json({ success: true });
@@ -1158,7 +1169,9 @@ async function initAllSessions() {
   }
 }
 
-initAllSessions();
+function initSessions() {
+  initAllSessions();
+}
 
 function clearReconnectTimer() {
   if (reconnectTimer) {
