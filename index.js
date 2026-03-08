@@ -40,12 +40,20 @@ const { startCleanup } = require('./utils/cleanup');
 initializeTempSystem();
 startCleanup();
 
+app.get('/health', (req, res) => res.status(200).send('OK'));
+app.get('/', (req, res) => {
+  if (req.headers['user-agent'] && req.headers['user-agent'].includes('Go-http-client')) {
+    return res.status(200).send('OK');
+  }
+  return res.redirect('/login');
+});
+
 app.use(express.json());
 app.use(session({
   secret: 'infinity-md-secret',
   resave: false,
   saveUninitialized: true,
-  cookie: { secure: false } // Set to true if using HTTPS
+  cookie: { secure: false }
 }));
 
 const isAuthenticated = (req, res, next) => {
@@ -94,8 +102,6 @@ app.get('/api/auth/logout', (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/health', (req, res) => res.status(200).send('OK'));
-app.get('/', (req, res) => res.redirect('/login'));
 app.get('/dashboard', isAuthenticated, (req, res) => res.sendFile(path.join(__dirname, 'views/dashboard.html')));
 
 app.get('/api/sessions', isAuthenticated, async (req, res) => {
@@ -327,15 +333,9 @@ async function connectSession(id, sessionData) {
       } else {
         if (!sessionData._retryCount) sessionData._retryCount = 0;
         sessionData._retryCount++;
-        const maxRetries = 5;
-        if (sessionData._retryCount > maxRetries) {
-          console.log(`⛔ Session ${id} exceeded max retries (${maxRetries}), stopping reconnect`);
-          activeSessions.delete(id);
-        } else {
-          const delay = Math.min(5000 * Math.pow(2, sessionData._retryCount - 1), 60000);
-          console.log(`🔄 Reconnecting session ${id} (Status: ${statusCode}, attempt ${sessionData._retryCount}/${maxRetries}, delay ${delay/1000}s)...`);
-          setTimeout(() => connectSession(id, sessionData), delay);
-        }
+        const delay = Math.min(5000 * Math.pow(1.5, sessionData._retryCount - 1), 120000);
+        console.log(`🔄 Reconnecting session ${id} (Status: ${statusCode}, attempt ${sessionData._retryCount}, delay ${Math.round(delay/1000)}s)...`);
+        setTimeout(() => connectSession(id, sessionData), delay);
       }
     }
   });
@@ -628,7 +628,20 @@ app.get('/api/stats', isAuthenticated, (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('Web server listening on', PORT));
+const server = app.listen(PORT, '0.0.0.0', () => console.log('Web server listening on', PORT));
+
+setInterval(() => {
+  const http = require('http');
+  http.get(`http://127.0.0.1:${PORT}/health`, () => {}).on('error', () => {});
+}, 4 * 60 * 1000);
+
+process.on('SIGTERM', () => {
+  console.log('⚠️ Received SIGTERM, keeping alive...');
+});
+process.on('SIGINT', () => {
+  console.log('⚠️ Received SIGINT, shutting down gracefully...');
+  server.close(() => process.exit(0));
+});
 
 // Main Bot logic
 let sock = null;
