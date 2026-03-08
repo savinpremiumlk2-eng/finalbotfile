@@ -1,52 +1,63 @@
+const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const express = require('express');
 
 /**
  * Infinity MD - Render Web Service Stable Entry
- * Server starts FIRST, then loads heavy modules so deploy healthchecks pass immediately.
+ * Raw HTTP server starts INSTANTLY for healthchecks, then Express + modules load after.
  */
 
-process.on('uncaughtException', (err) => {
-  const msg = err?.message || '';
-  if (msg.includes('Decipheriv') || msg.includes('Bad MAC') || msg.includes('decrypt')) {
-    console.error('⚠️ Caught Baileys decryption error (non-fatal):', msg);
-  } else {
-    console.error('⚠️ Uncaught exception (kept alive):', err);
-  }
-});
-process.on('unhandledRejection', (reason) => {
-  console.error('⚠️ Unhandled rejection (kept alive):', reason?.message || reason);
-});
+const PORT = process.env.PORT || 3000;
+let app, server, serverReady = false;
 
-const app = express();
 const activeSessions = new Map();
 const sessionsDbPath = path.join(__dirname, 'database', 'sessions.json');
-let serverReady = false;
 
 let pino, Boom, makeWASocket, useMultiFileAuthState, DisconnectReason,
     fetchLatestBaileysVersion, makeCacheableSignalKeyStore, Browsers,
     jidNormalizedUser, baileysDelay, QRCode, pn, logger;
 let config, handler, database, auth;
 
-app.get('/', (req, res) => {
-  if (!serverReady) return res.status(200).send('OK');
-  res.status(200).send('<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=/login"><title>Infinity MD</title></head><body>OK</body></html>');
+server = http.createServer((req, res) => {
+  if (!app) {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('OK');
+    return;
+  }
+  app(req, res);
 });
 
-app.use(express.json());
-app.use(require('express-session')({
-  secret: 'infinity-md-secret',
-  resave: false,
-  saveUninitialized: true,
-  cookie: { secure: false }
-}));
-
-const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log('✅ Web server listening on', PORT);
 
+  process.on('uncaughtException', (err) => {
+    const msg = err?.message || '';
+    if (msg.includes('Decipheriv') || msg.includes('Bad MAC') || msg.includes('decrypt')) {
+      console.error('⚠️ Caught Baileys decryption error (non-fatal):', msg);
+    } else {
+      console.error('⚠️ Uncaught exception (kept alive):', err);
+    }
+  });
+  process.on('unhandledRejection', (reason) => {
+    console.error('⚠️ Unhandled rejection (kept alive):', reason?.message || reason);
+  });
+
   setTimeout(() => {
+    const express = require('express');
+    app = express();
+
+    app.get('/', (req, res) => {
+      res.status(200).send('<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=/login"><title>Infinity MD</title></head><body>OK</body></html>');
+    });
+
+    app.use(express.json());
+    app.use(require('express-session')({
+      secret: 'infinity-md-secret',
+      resave: false,
+      saveUninitialized: true,
+      cookie: { secure: false }
+    }));
+
     pino = require('pino');
     ({ Boom } = require('@hapi/boom'));
     ({
@@ -97,10 +108,127 @@ const server = app.listen(PORT, '0.0.0.0', () => {
       }
     }
 
+    registerRoutes();
     serverReady = true;
     initSessions();
   }, 0);
 });
+
+async function connectSession(id, sessionData) {
+  const sessionFolder = path.join(__dirname, 'session', sessionData.folder);
+
+  if (!fs.existsSync(sessionFolder)) {
+    fs.mkdirSync(sessionFolder, { recursive: true });
+  }
+
+  if (!fs.existsSync(path.join(sessionFolder, 'creds.json')) && sessionData.creds) {
+    fs.writeFileSync(path.join(sessionFolder, 'creds.json'), sessionData.creds);
+  }
+
+  if (id && id.startsWith('KnightBot!')) {
+    try {
+      const zlib = require('zlib');
+      const b64data = id.split('!')[1];
+      const decoded = zlib.gunzipSync(Buffer.from(b64data, 'base64'));
+      fs.writeFileSync(path.join(sessionFolder, 'creds.json'), decoded);
+    } catch (e) {
+      console.error(`Error decoding KnightBot session ${id}:`, e.message);
+    }
+  }
+
+  const { state, saveCreds } = await useMultiFileAuthState(sessionFolder);
+  const { version } = await fetchLatestBaileysVersion();
+
+  const newSock = makeWASocket({
+    version,
+    logger,
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, logger),
+    },
+    browser: [sessionData.name || 'Infinity MD', 'Chrome', '1.0.0'],
+    syncFullHistory: false,
+    markOnlineOnConnect: true,
+  });
+
+  newSock._customConfig = {
+     botName: sessionData.name || 'Infinity MD',
+     ownerName: sessionData.ownerName || config.ownerName[0],
+     ownerNumber: sessionData.ownerNumber || config.ownerNumber[0],
+     settings: sessionData.settings || {},
+     userId: sessionData.userId
+  };
+
+  if (newSock.ws) {
+    newSock.ws.on('error', (err) => {
+      console.error(`⚠️ WebSocket error for session ${id.substring(0, 20)}...:`, err?.message || err);
+    });
+  }
+
+  newSock.ev.on('creds.update', async () => {
+    await saveCreds();
+    const credsData = fs.readFileSync(path.join(sessionFolder, 'creds.json'), 'utf8');
+    await database.saveSessionCreds(id, credsData);
+  });
+
+  newSock.ev.on('call', async (callUpdate) => {
+    for (const call of callUpdate) {
+      if (call.status === 'offer') {
+        try {
+          const anticall = require('./commands/owner/anticall');
+          if (anticall && typeof anticall.onCall === 'function') {
+            await anticall.onCall(newSock, call);
+          }
+        } catch (e) {
+          console.error('Call handling error:', e);
+        }
+      }
+    }
+  });
+
+  newSock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect } = update;
+    if (connection === 'open') {
+      activeSessions.set(id, newSock);
+      sessionData._retryCount = 0;
+      console.log(`✅ Session ${id} connected!`);
+    }
+    if (connection === 'close') {
+      const statusCode = (lastDisconnect?.error instanceof Boom)
+        ? lastDisconnect.error.output?.statusCode
+        : lastDisconnect?.error?.output?.statusCode;
+
+      const sessions = await database.getAllSessions();
+      const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
+      const isDeleted = !sessions[id] && id !== config.sessionID;
+
+      if (isLoggedOut || isDeleted) {
+        activeSessions.delete(id);
+        console.log(`❌ Session ${id} stopped (${isLoggedOut ? 'Logged out' : 'Deleted'})`);
+      } else {
+        if (!sessionData._retryCount) sessionData._retryCount = 0;
+        sessionData._retryCount++;
+        const delay = Math.min(5000 * Math.pow(1.5, sessionData._retryCount - 1), 120000);
+        console.log(`🔄 Reconnecting session ${id} (Status: ${statusCode}, attempt ${sessionData._retryCount}, delay ${Math.round(delay/1000)}s)...`);
+        setTimeout(() => connectSession(id, sessionData), delay);
+      }
+    }
+  });
+
+  newSock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return;
+    if (!handler || typeof handler.handleMessage !== 'function') {
+      console.error('Handler not loaded - cannot process messages');
+      return;
+    }
+    for (const msg of messages) {
+      if (!msg?.message) continue;
+      try { await handler.handleMessage(newSock, msg); } catch (err) { console.error('Handler Error:', err); }
+    }
+  });
+}
+
+function registerRoutes() {
 
 const isAuthenticated = (req, res, next) => {
   if (!serverReady) {
@@ -293,125 +421,6 @@ app.post('/api/session/restart', isAuthenticated, async (req, res) => {
     res.status(500).send(error.message);
   }
 });
-
-async function connectSession(id, sessionData) {
-  const sessionFolder = path.join(__dirname, 'session', sessionData.folder);
-  
-  // Ensure session folder exists
-  if (!fs.existsSync(sessionFolder)) {
-    fs.mkdirSync(sessionFolder, { recursive: true });
-  }
-
-  // Restore creds from DB if they don't exist in folder
-  if (!fs.existsSync(path.join(sessionFolder, 'creds.json')) && sessionData.creds) {
-    fs.writeFileSync(path.join(sessionFolder, 'creds.json'), sessionData.creds);
-  }
-
-  // Handle KnightBot! session ID decoding if needed
-  if (id && id.startsWith('KnightBot!')) {
-    try {
-      const zlib = require('zlib');
-      const b64data = id.split('!')[1];
-      const decoded = zlib.gunzipSync(Buffer.from(b64data, 'base64'));
-      fs.writeFileSync(path.join(sessionFolder, 'creds.json'), decoded);
-    } catch (e) {
-      console.error(`Error decoding KnightBot session ${id}:`, e.message);
-    }
-  }
-
-  const { state, saveCreds } = await useMultiFileAuthState(sessionFolder);
-  const { version } = await fetchLatestBaileysVersion();
-
-  const newSock = makeWASocket({
-    version,
-    logger,
-    auth: {
-      creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, logger),
-    },
-    browser: [sessionData.name || 'Infinity MD', 'Chrome', '1.0.0'],
-    syncFullHistory: false,
-    markOnlineOnConnect: true,
-  });
-
-  newSock._customConfig = {
-     botName: sessionData.name || 'Infinity MD',
-     ownerName: sessionData.ownerName || config.ownerName[0],
-     ownerNumber: sessionData.ownerNumber || config.ownerNumber[0],
-     settings: sessionData.settings || {},
-     userId: sessionData.userId
-  };
-
-  if (newSock.ws) {
-    newSock.ws.on('error', (err) => {
-      console.error(`⚠️ WebSocket error for session ${id.substring(0, 20)}...:`, err?.message || err);
-    });
-  }
-
-  newSock.ev.on('creds.update', async () => {
-    await saveCreds();
-    // After saving creds to disk, we could potentially back them up to DB
-    const credsData = fs.readFileSync(path.join(sessionFolder, 'creds.json'), 'utf8');
-    await database.saveSessionCreds(id, credsData);
-  });
-  
-  // Anti-Call Listener
-  newSock.ev.on('call', async (callUpdate) => {
-    for (const call of callUpdate) {
-      if (call.status === 'offer') {
-        try {
-          const anticall = require('./commands/owner/anticall');
-          if (anticall && typeof anticall.onCall === 'function') {
-            await anticall.onCall(newSock, call);
-          }
-        } catch (e) {
-          console.error('Call handling error:', e);
-        }
-      }
-    }
-  });
-
-  newSock.ev.on('connection.update', async (update) => {
-    const { connection, lastDisconnect } = update;
-    if (connection === 'open') {
-      activeSessions.set(id, newSock);
-      sessionData._retryCount = 0;
-      console.log(`✅ Session ${id} connected!`);
-    }
-    if (connection === 'close') {
-      const statusCode = (lastDisconnect?.error instanceof Boom)
-        ? lastDisconnect.error.output?.statusCode
-        : lastDisconnect?.error?.output?.statusCode;
-      
-      const sessions = await database.getAllSessions();
-      const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
-      const isDeleted = !sessions[id] && id !== config.sessionID;
-
-      if (isLoggedOut || isDeleted) {
-        activeSessions.delete(id);
-        console.log(`❌ Session ${id} stopped (${isLoggedOut ? 'Logged out' : 'Deleted'})`);
-      } else {
-        if (!sessionData._retryCount) sessionData._retryCount = 0;
-        sessionData._retryCount++;
-        const delay = Math.min(5000 * Math.pow(1.5, sessionData._retryCount - 1), 120000);
-        console.log(`🔄 Reconnecting session ${id} (Status: ${statusCode}, attempt ${sessionData._retryCount}, delay ${Math.round(delay/1000)}s)...`);
-        setTimeout(() => connectSession(id, sessionData), delay);
-      }
-    }
-  });
-
-  newSock.ev.on('messages.upsert', async ({ messages, type }) => {
-    if (type !== 'notify') return;
-    if (!handler || typeof handler.handleMessage !== 'function') {
-      console.error('Handler not loaded - cannot process messages');
-      return;
-    }
-    for (const msg of messages) {
-      if (!msg?.message) continue;
-      try { await handler.handleMessage(newSock, msg); } catch (err) { console.error('Handler Error:', err); }
-    }
-  });
-}
 
 app.post('/api/session/add', isAuthenticated, async (req, res) => {
   const { sessionId, botName, ownerName, ownerNumber } = req.body;
@@ -1135,6 +1144,8 @@ app.use((err, req, res, next) => {
   if (res.headersSent) return next(err);
   res.status(500).json({ success: false, message: 'Internal server error' });
 });
+
+} // end registerRoutes
 
 process.on('SIGINT', () => {
   console.log('⚠️ Received SIGINT, shutting down gracefully...');

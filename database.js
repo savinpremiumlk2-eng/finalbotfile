@@ -1,15 +1,12 @@
-const sqlite3 = require('sqlite3').verbose();
+const { Pool } = require('pg');
 const path = require('path');
 const fs = require('fs');
 
-const DB_FILE = path.join(__dirname, 'database', 'bot.db');
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: false,
+});
 
-// Ensure database directory exists
-if (!fs.existsSync(path.join(__dirname, 'database'))) {
-  fs.mkdirSync(path.join(__dirname, 'database'), { recursive: true });
-}
-
-const db = new sqlite3.Database(DB_FILE);
 let globalSettingsCache = {
   maintenance: false,
   forceBot: false,
@@ -18,55 +15,60 @@ let globalSettingsCache = {
 };
 let moderatorsCache = [];
 
-// Initialize Tables and Cache
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS dashboard_users (
-    username TEXT PRIMARY KEY,
-    password TEXT,
-    data TEXT
-  )`);
+async function initDatabase() {
+  const client = await pool.connect();
+  try {
+    await client.query(`CREATE TABLE IF NOT EXISTS dashboard_users (
+      username TEXT PRIMARY KEY,
+      password TEXT,
+      data TEXT
+    )`);
 
-  db.run(`CREATE TABLE IF NOT EXISTS sessions (
-    id TEXT PRIMARY KEY,
-    userId TEXT,
-    folder TEXT,
-    name TEXT,
-    ownerName TEXT,
-    ownerNumber TEXT,
-    settings TEXT,
-    creds TEXT,
-    addedAt INTEGER
-  )`, (err) => {
-    if (!err) {
-      db.run("ALTER TABLE sessions ADD COLUMN creds TEXT", (alterErr) => {
-        // Ignore "duplicate column name" error
-      });
+    await client.query(`CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      userid TEXT,
+      folder TEXT,
+      name TEXT,
+      ownername TEXT,
+      ownernumber TEXT,
+      settings TEXT DEFAULT '{}',
+      creds TEXT,
+      addedat BIGINT
+    )`);
+
+    await client.query(`CREATE TABLE IF NOT EXISTS global_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    )`);
+
+    await client.query(`CREATE TABLE IF NOT EXISTS group_settings (
+      groupid TEXT PRIMARY KEY,
+      settings TEXT
+    )`);
+
+    await client.query(`CREATE TABLE IF NOT EXISTS moderators (
+      userid TEXT PRIMARY KEY
+    )`);
+
+    await client.query(`CREATE TABLE IF NOT EXISTS user_settings (
+      username TEXT PRIMARY KEY,
+      settings TEXT DEFAULT '{}'
+    )`);
+
+    const colCheck = await client.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'moderators' AND column_name = 'userId'`);
+    if (colCheck.rows.length > 0) {
+      await client.query(`ALTER TABLE moderators RENAME COLUMN "userId" TO userid`);
+      console.log("✅ Migrated moderators.userId to lowercase");
     }
-  });
+    const colCheck2 = await client.query(`SELECT column_name FROM information_schema.columns WHERE table_name = 'group_settings' AND column_name = 'groupId'`);
+    if (colCheck2.rows.length > 0) {
+      await client.query(`ALTER TABLE group_settings RENAME COLUMN "groupId" TO groupid`);
+      console.log("✅ Migrated group_settings.groupId to lowercase");
+    }
 
-  db.run(`CREATE TABLE IF NOT EXISTS global_settings (
-    key TEXT PRIMARY KEY,
-    value TEXT
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS group_settings (
-    groupId TEXT PRIMARY KEY,
-    settings TEXT
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS moderators (
-    userId TEXT PRIMARY KEY
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS user_settings (
-    username TEXT PRIMARY KEY,
-    settings TEXT DEFAULT '{}'
-  )`);
-
-  // Initial global settings cache load
-  db.all("SELECT * FROM global_settings", (err, rows) => {
-    if (!err && rows) {
-      rows.forEach(row => {
+    const settingsRows = await client.query("SELECT * FROM global_settings");
+    if (settingsRows.rows) {
+      settingsRows.rows.forEach(row => {
         try {
           globalSettingsCache[row.key] = JSON.parse(row.value);
         } catch (e) {
@@ -75,65 +77,62 @@ db.serialize(() => {
       });
       console.log("✅ Global settings loaded into cache");
     }
-  });
 
-  // Load existing sessions into DB if sessions.json exists (migration/sync)
-  const sessionsJsonPath = path.join(__dirname, 'database', 'sessions.json');
-  if (fs.existsSync(sessionsJsonPath)) {
-    try {
-      const sessions = JSON.parse(fs.readFileSync(sessionsJsonPath, 'utf8'));
-      Object.entries(sessions).forEach(([id, data]) => {
-        db.run(
-          "INSERT OR IGNORE INTO sessions (id, userId, folder, name, ownerName, ownerNumber, settings, addedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-          [id, data.userId, data.folder, data.name, data.ownerName, data.ownerNumber, JSON.stringify(data.settings || {}), data.addedAt || Date.now()]
-        );
-      });
-      console.log("✅ Sessions synced from JSON to SQLite");
-    } catch (e) {
-      console.error("❌ Error syncing sessions:", e.message);
+    const modRows = await client.query('SELECT userid FROM moderators');
+    if (modRows.rows) {
+      moderatorsCache = modRows.rows.map(r => r.userid);
     }
+
+    const sessionsJsonPath = path.join(__dirname, 'database', 'sessions.json');
+    if (fs.existsSync(sessionsJsonPath)) {
+      try {
+        const sessions = JSON.parse(fs.readFileSync(sessionsJsonPath, 'utf8'));
+        for (const [id, data] of Object.entries(sessions)) {
+          await client.query(
+            `INSERT INTO sessions (id, userid, folder, name, ownername, ownernumber, settings, addedat)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             ON CONFLICT (id) DO NOTHING`,
+            [id, data.userId, data.folder, data.name, data.ownerName, data.ownerNumber, JSON.stringify(data.settings || {}), data.addedAt || Date.now()]
+          );
+        }
+        console.log("✅ Sessions synced from JSON to PostgreSQL");
+      } catch (e) {
+        console.error("❌ Error syncing sessions:", e.message);
+      }
+    }
+  } finally {
+    client.release();
   }
+}
 
-  // Initial moderators cache load
-  db.all("SELECT userId FROM moderators", (err, rows) => {
-    if (!err && rows) {
-      moderatorsCache = rows.map(r => r.userId);
-    }
-  });
-});
+initDatabase().catch(err => console.error("❌ Database init error:", err.message));
 
-const query = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows);
-    });
-  });
+const query = async (sql, params = []) => {
+  const result = await pool.query(sql, params);
+  return result.rows;
 };
 
-const run = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function(err) {
-      if (err) reject(err);
-      else resolve(this);
-    });
-  });
+const run = async (sql, params = []) => {
+  const result = await pool.query(sql, params);
+  return result;
 };
 
 module.exports = {
-  // Authentication (Dashboard Users)
   saveDashboardUser: async (username, password) => {
-    return await run("INSERT OR REPLACE INTO dashboard_users (username, password) VALUES (?, ?)", [username, password]);
+    return await run(
+      `INSERT INTO dashboard_users (username, password) VALUES ($1, $2)
+       ON CONFLICT (username) DO UPDATE SET password = EXCLUDED.password`,
+      [username, password]
+    );
   },
   getDashboardUser: async (username) => {
-    const rows = await query("SELECT * FROM dashboard_users WHERE username = ?", [username]);
+    const rows = await query("SELECT * FROM dashboard_users WHERE username = $1", [username]);
     return rows[0];
   },
   query: async (sql, params = []) => {
     return await query(sql, params);
   },
 
-  // Global Settings
   getGlobalSettings: async () => {
     return globalSettingsCache;
   },
@@ -143,28 +142,37 @@ module.exports = {
   updateGlobalSettings: async (settings) => {
     for (const [key, value] of Object.entries(settings)) {
       globalSettingsCache[key] = value;
-      await run("INSERT OR REPLACE INTO global_settings (key, value) VALUES (?, ?)", [key, JSON.stringify(value)]);
+      await run(
+        `INSERT INTO global_settings (key, value) VALUES ($1, $2)
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+        [key, JSON.stringify(value)]
+      );
     }
     return true;
   },
 
-  // Group Settings
   getGroupSettings: async (groupId) => {
-    const rows = await query("SELECT settings FROM group_settings WHERE groupId = ?", [groupId]);
+    const rows = await query('SELECT settings FROM group_settings WHERE groupid = $1', [groupId]);
     if (rows.length > 0) return JSON.parse(rows[0].settings);
-    
+
     const config = require('./config');
     const defaultSettings = { ...config.defaultGroupSettings };
-    await run("INSERT INTO group_settings (groupId, settings) VALUES (?, ?)", [groupId, JSON.stringify(defaultSettings)]);
+    await run(
+      'INSERT INTO group_settings (groupid, settings) VALUES ($1, $2) ON CONFLICT (groupid) DO NOTHING',
+      [groupId, JSON.stringify(defaultSettings)]
+    );
     return defaultSettings;
   },
   updateGroupSettings: async (groupId, settings) => {
     const current = await module.exports.getGroupSettings(groupId);
     const updated = { ...current, ...settings };
-    return await run("INSERT OR REPLACE INTO group_settings (groupId, settings) VALUES (?, ?)", [groupId, JSON.stringify(updated)]);
+    return await run(
+      `INSERT INTO group_settings (groupid, settings) VALUES ($1, $2)
+       ON CONFLICT (groupid) DO UPDATE SET settings = EXCLUDED.settings`,
+      [groupId, JSON.stringify(updated)]
+    );
   },
 
-  // Moderators System
   getModerators: async () => {
     return moderatorsCache;
   },
@@ -174,48 +182,53 @@ module.exports = {
   addModerator: async (userId) => {
     if (!moderatorsCache.includes(userId)) {
       moderatorsCache.push(userId);
-      return await run("INSERT OR IGNORE INTO moderators (userId) VALUES (?)", [userId]);
+      return await run('INSERT INTO moderators (userid) VALUES ($1) ON CONFLICT DO NOTHING', [userId]);
     }
     return false;
   },
   removeModerator: async (userId) => {
     moderatorsCache = moderatorsCache.filter(id => id !== userId);
-    return await run("DELETE FROM moderators WHERE userId = ?", [userId]);
+    return await run('DELETE FROM moderators WHERE userid = $1', [userId]);
   },
 
-  // Sessions
   getAllSessions: async () => {
     const rows = await query("SELECT * FROM sessions");
     return rows.reduce((acc, row) => {
       acc[row.id] = {
-        userId: row.userId,
+        userId: row.userid,
         folder: row.folder,
         name: row.name,
-        ownerName: row.ownerName,
-        ownerNumber: row.ownerNumber,
+        ownerName: row.ownername,
+        ownerNumber: row.ownernumber,
         settings: JSON.parse(row.settings || '{}'),
         creds: row.creds,
-        addedAt: row.addedAt
+        addedAt: row.addedat
       };
       return acc;
     }, {});
   },
   saveSession: async (id, data) => {
+    const existingCreds = await query("SELECT creds FROM sessions WHERE id = $1", [id]);
+    const creds = (data.creds) ? data.creds : (existingCreds.length > 0 ? existingCreds[0].creds : null);
     return await run(
-      "INSERT OR REPLACE INTO sessions (id, userId, folder, name, ownerName, ownerNumber, settings, creds, addedAt) VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT creds FROM sessions WHERE id = ?), ?)",
-      [id, data.userId, data.folder, data.name, data.ownerName, data.ownerNumber, JSON.stringify(data.settings || {}), id, data.addedAt || Date.now()]
+      `INSERT INTO sessions (id, userid, folder, name, ownername, ownernumber, settings, creds, addedat)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (id) DO UPDATE SET
+         userid = EXCLUDED.userid, folder = EXCLUDED.folder, name = EXCLUDED.name,
+         ownername = EXCLUDED.ownername, ownernumber = EXCLUDED.ownernumber,
+         settings = EXCLUDED.settings, creds = EXCLUDED.creds, addedat = EXCLUDED.addedat`,
+      [id, data.userId, data.folder, data.name, data.ownerName, data.ownerNumber, JSON.stringify(data.settings || {}), creds, data.addedAt || Date.now()]
     );
   },
   saveSessionCreds: async (id, creds) => {
-    return await run("UPDATE sessions SET creds = ? WHERE id = ?", [creds, id]);
+    return await run("UPDATE sessions SET creds = $1 WHERE id = $2", [creds, id]);
   },
   deleteSession: async (id) => {
-    return await run("DELETE FROM sessions WHERE id = ?", [id]);
+    return await run("DELETE FROM sessions WHERE id = $1", [id]);
   },
 
-  // User Settings (per-user, applies to all their bots)
   getUserSettings: async (username) => {
-    const rows = await query("SELECT settings FROM user_settings WHERE username = ?", [username]);
+    const rows = await query("SELECT settings FROM user_settings WHERE username = $1", [username]);
     if (rows.length > 0) {
       try { return JSON.parse(rows[0].settings); } catch (e) { return {}; }
     }
@@ -224,11 +237,14 @@ module.exports = {
   updateUserSettings: async (username, settings) => {
     const current = await module.exports.getUserSettings(username);
     const updated = { ...current, ...settings };
-    await run("INSERT OR REPLACE INTO user_settings (username, settings) VALUES (?, ?)", [username, JSON.stringify(updated)]);
+    await run(
+      `INSERT INTO user_settings (username, settings) VALUES ($1, $2)
+       ON CONFLICT (username) DO UPDATE SET settings = EXCLUDED.settings`,
+      [username, JSON.stringify(updated)]
+    );
     return updated;
   },
 
-  // Deleted Messages (In-memory only for performance, as before)
   deletedMessagesCache: new Map(),
   saveDeletedMessage: (id, data) => {
     module.exports.deletedMessagesCache.set(id, data);
