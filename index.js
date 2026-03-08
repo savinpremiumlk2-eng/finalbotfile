@@ -36,38 +36,51 @@ const app = express();
 const logger = pino({ level: 'silent' });
 const activeSessions = new Map();
 const sessionsDbPath = path.join(__dirname, 'database', 'sessions.json');
+let serverReady = false;
 
 app.get('/health', (req, res) => res.status(200).send('OK'));
 app.get('/', (req, res) => {
-  const ua = (req.headers['user-agent'] || '').toLowerCase();
-  if (!ua || !ua.includes('mozilla')) {
-    return res.status(200).send('OK');
-  }
-  return res.redirect('/login');
+  res.status(200).send('<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=/login"><title>Infinity MD</title></head><body>OK</body></html>');
 });
-
-const PORT = process.env.PORT || 3000;
-const server = app.listen(PORT, '0.0.0.0', () => console.log('Web server listening on', PORT));
 
 // Ensure session directory exists
 if (!fs.existsSync(path.join(__dirname, 'session'))) {
   fs.mkdirSync(path.join(__dirname, 'session'), { recursive: true });
 }
 
-// ✅ Load config/settings
-require('./config');
-require('./settings');
-const config = require('./config');
-const handler = require('./handler');
-const database = require('./database');
-const auth = require('./utils/auth');
+// ✅ Load config/settings with error protection
+let config, handler, database, auth;
 const session = require('express-session');
-const { initializeTempSystem } = require('./utils/tempManager');
-const { startCleanup } = require('./utils/cleanup');
 
-// Initialize system
-initializeTempSystem();
-startCleanup();
+try {
+  require('./config');
+  require('./settings');
+  config = require('./config');
+  handler = require('./handler');
+  database = require('./database');
+  auth = require('./utils/auth');
+  const { initializeTempSystem } = require('./utils/tempManager');
+  const { startCleanup } = require('./utils/cleanup');
+  initializeTempSystem();
+  startCleanup();
+  console.log('✅ All modules loaded successfully');
+} catch (e) {
+  console.error('❌ Critical module loading error:', e);
+  if (!config) config = require('./config');
+  if (!database) {
+    try { database = require('./database'); } catch (_) {
+      console.error('❌ Database module failed to load');
+    }
+  }
+  if (!auth) {
+    try { auth = require('./utils/auth'); } catch (_) {
+      console.error('❌ Auth module failed to load');
+    }
+  }
+  if (!handler) {
+    console.error('❌ Handler module failed to load - bot commands will not work');
+  }
+}
 
 app.use(express.json());
 app.use(session({
@@ -76,6 +89,12 @@ app.use(session({
   saveUninitialized: true,
   cookie: { secure: false }
 }));
+
+const PORT = process.env.PORT || 3000;
+const server = app.listen(PORT, '0.0.0.0', () => {
+  serverReady = true;
+  console.log('✅ Web server listening on', PORT);
+});
 
 const isAuthenticated = (req, res, next) => {
   if (req.session && req.session.loggedIn) {
