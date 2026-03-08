@@ -32,17 +32,20 @@ module.exports = {
 }
 ```
 
-### Categories & Plugins
-- **admin/** - Group admin tools (antilink, kick, mute, warn, welcome, goodbye, etc.)
-- **ai/** - AI commands (ai, aimaths, magicstudio)
-- **anime/** - Anime image commands (waifu, neko, etc.)
-- **fun/** - Entertainment (joke, meme, dare, truth, ship, gayrate, 8ball, coinflip, roll, rps, trivia, quote, emojimix)
-- **general/** - Core commands (menu, ping, sticker, uptime, qr, whois, report, etc.)
-- **media/** - Downloaders (song, video, tiktok, instagram, facebook, lyrics, sinhanada)
-- **movie/** - Movie search/download (film2, movie)
-- **nsfw/** - NSFW content (restricted)
-- **owner/** - Bot owner commands (mode, block, restart, autopp, settings, antiviewonce, etc.)
-- **utility/** - Tools (weather, translate, calc, wiki, shorten, remind, base64, wordcount)
+### Categories & Plugins (260 commands, v2.0.0)
+- **admin/** (32) - Group admin tools (antilink, kick, mute, warn, welcome, poll, lock/unlock, setname/desc, add, promote/demote, etc.)
+- **ai/** (11) - AI commands (ai, gpt, imagine, summarize, grammar, story, poem, code, explain, aimaths, magicstudio)
+- **anime/** (17) - Anime images & info (waifu, neko, hug, slap, cuddle, animequote, manga, cosplay, etc.)
+- **converter/** (10) - Media conversion (toimg, togif, tomp3, toptt, tourl, emojimix, circle, blur, invert, grayscale)
+- **fun/** (33) - Entertainment (joke, meme, dare, truth, ship, 8ball, trivia, roast, pickup, riddle, ascii, wouldyourather, etc.)
+- **game/** (10) - Interactive games (tictactoe, guess, hangman, quiz, mathquiz, wordchain, scramble, slots, roulette, blackjack)
+- **general/** (36) - Core commands (menu, ping, sticker, uptime, alive, info, totalcmds, speed, runtime, botlist, etc.)
+- **media/** (20) - Downloaders (song, video, play, ytmp3, ytmp4, tiktok, instagram, pinterest, wallpaper, etc.)
+- **movie/** (3) - Movie search/download (film2, movie, filmsearch)
+- **nsfw/** (3) - NSFW content (restricted)
+- **owner/** (32) - Bot owner commands (mode, block, restart, eval, exec, maintenance, join, leave, banuser, chatlist, etc.)
+- **textmaker/** (28) - Text effects (neon, fire, glitch, galaxy, rainbow, toxic, lava, gold, carbon, gradient, etc.)
+- **utility/** (25) - Tools (weather, translate, calc, wiki, binary, morse, hex, password, uuid, hash, json, color, etc.)
 
 ## Key Dependencies
 - `@whiskeysockets/baileys` - WhatsApp Web API

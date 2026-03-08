@@ -121,6 +121,7 @@ module.exports = {
     'help', 'commands',
     'ownermenu', 'adminmenu', 'dlmenu', 'funmenu', 'aimenu',
     'toolmenu', 'entertainmentmenu', 'textmenu', 'moviemenu', 'generalmenu',
+    'convertermenu', 'gamemenu',
     // back-compat
     'animemenu', 'toolsmenu'
   ],
@@ -166,8 +167,10 @@ module.exports = {
         '8': `${prefix}textmenu`,
         '9': `${prefix}moviemenu`,
         '10': `${prefix}generalmenu`,
-        '11': `${prefix}autotyping`,
-        '12': `${prefix}autovoice`
+        '11': `${prefix}convertermenu`,
+        '12': `${prefix}gamemenu`,
+        '13': `${prefix}autotyping`,
+        '14': `${prefix}autovoice`
       };
       setSession(chatId, sender, numberMap);
 
@@ -192,11 +195,13 @@ module.exports = {
       menuText += `│ 8️⃣ ✍️ ${prefix}textmenu\n`;
       menuText += `│ 9️⃣ 🎬 ${prefix}moviemenu\n`;
       menuText += `│ 🔟 🧭 ${prefix}generalmenu\n`;
-      menuText += `│ 1️⃣1️⃣ ⌨️ ${prefix}autotyping\n`;
-      menuText += `│ 1️⃣2️⃣ 🎤 ${prefix}autovoice\n`;
+      menuText += `│ 1️⃣1️⃣ 🔄 ${prefix}convertermenu\n`;
+      menuText += `│ 1️⃣2️⃣ 🎮 ${prefix}gamemenu\n`;
+      menuText += `│ 1️⃣3️⃣ ⌨️ ${prefix}autotyping\n`;
+      menuText += `│ 1️⃣4️⃣ 🎤 ${prefix}autovoice\n`;
       menuText += `╰────────────────────\n\n`;
 
-      menuText += `💡 *Reply with a number* (1-12)\n`;
+      menuText += `💡 *Reply with a number* (1-14)\n`;
       menuText += `╭───〔 🌟 CREDITS 〕───\n`;
       menuText += `│ ⚡ *Infinity MD* by Infinity Team\n`;
       menuText += `│ 🧠 Powered by Baileys\n`;
@@ -244,6 +249,8 @@ module.exports = {
       case 'textmenu':            category = 'textmaker';     title = '✍️ TEXT MENU'; break;
       case 'moviemenu':           category = 'movie';         title = '🎬 MOVIE MENU'; break;
       case 'generalmenu':         category = 'general';       title = '🧭 GENERAL MENU'; break;
+      case 'convertermenu':       category = 'converter';     title = '🔄 CONVERTER MENU'; break;
+      case 'gamemenu':            category = 'game';          title = '🎮 GAMES MENU'; break;
 
       // ".menu admin"
       case 'owner':               category = 'owner';         title = '👑 OWNER MENU'; break;
@@ -256,6 +263,8 @@ module.exports = {
       case 'textmaker':           category = 'textmaker';     title = '✍️ TEXT MENU'; break;
       case 'movies': case 'movie': category = 'movie';         title = '🎬 MOVIE MENU'; break;
       case 'general':             category = 'general';       title = '🧭 GENERAL MENU'; break;
+      case 'converter':           category = 'converter';     title = '🔄 CONVERTER MENU'; break;
+      case 'game': case 'games':  category = 'game';          title = '🎮 GAMES MENU'; break;
 
       // back-compat
       case 'animemenu':           category = 'entertainment'; title = '👾 ENTERTAINMENT MENU'; break;

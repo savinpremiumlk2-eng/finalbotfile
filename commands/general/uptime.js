@@ -39,7 +39,7 @@ function formatUptime(seconds) {
 
 module.exports = {
   name: 'uptime',
-  aliases: ['runtime', 'botuptime', 'alive'],
+  aliases: ['botuptime'],
   category: 'general',
   description: 'Show how long the bot has been running',
   usage: '.uptime',
@@ -52,7 +52,7 @@ module.exports = {
       
 // Get bot info
 const botName = config.botName || 'Bot';
-const botVersion = 'V1.0.1';
+const botVersion = 'v2.0.0';
       
       // Build response message
       let message = `╭━━『 *Bot Uptime* 』━━╮\n\n`;

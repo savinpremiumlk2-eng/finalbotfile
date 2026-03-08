@@ -43,7 +43,7 @@ module.exports = {
 ┃ 📦 Heap     : ${heapUsed}/${heapTotal} MB
 ┃ 🖥 OS       : ${os.platform()} ${os.arch()}
 ┃ 🟩 Node     : ${process.version}
-┃ 🏷 Version  : v5.1.0
+┃ 🏷 Version  : v2.0.0
 ╰━━━━━━━━━━━━━━━━━━━━⬣
 
 ✨ Everything working perfectly!
