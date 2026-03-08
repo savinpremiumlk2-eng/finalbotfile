@@ -181,6 +181,11 @@ textarea{resize:vertical;min-height:80px}
 .toast.info{background:rgba(6,182,212,0.15);border:1px solid rgba(6,182,212,0.3);color:var(--cyan)}
 @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
 
+/* Deploy tabs */
+.deploy-tab.active{background:linear-gradient(135deg,var(--cyan),#0891b2) !important;color:#fff !important}
+.deploy-tab:hover:not(.active){background:var(--surface-3) !important;color:var(--text) !important}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+
 /* Mobile */
 .mobile-toggle{display:none;position:fixed;top:16px;left:16px;z-index:200;background:var(--surface);border:1px solid var(--border);padding:10px;border-radius:10px;color:var(--text);cursor:pointer;font-size:1.2rem}
 @media(max-width:768px){
@@ -282,27 +287,126 @@ textarea{resize:vertical;min-height:80px}
           <div class="card-header">
             <div class="card-title"><span class="dot" style="background:var(--cyan)"></span> Deploy New Bot</div>
           </div>
-          <div style="display:grid;gap:14px">
-            <div>
-              <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Session ID</label>
-              <input type="text" id="inp-sessionId" placeholder="KnightBot!...">
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
-              <div>
-                <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Bot Name</label>
-                <input type="text" id="inp-botName" placeholder="My Bot">
-              </div>
-              <div>
-                <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Owner Name</label>
-                <input type="text" id="inp-ownerName" placeholder="Your Name">
-              </div>
-            </div>
-            <div>
-              <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Owner Number</label>
-              <input type="text" id="inp-ownerNumber" placeholder="94xxxxxxxxx">
-            </div>
-            <button class="btn btn-primary" style="width:100%;padding:14px;font-size:0.95rem" onclick="addSession()">Deploy Bot Instance</button>
+
+          <div style="display:flex;border-radius:12px;overflow:hidden;border:1px solid var(--border);margin-bottom:20px;background:var(--surface-2)">
+            <button class="deploy-tab active" data-tab="session" onclick="switchDeployTab('session',this)" style="flex:1;padding:12px;border:none;cursor:pointer;font-family:inherit;font-size:0.82rem;font-weight:600;transition:all 0.2s;background:transparent;color:var(--muted)">&#128273; Session ID</button>
+            <button class="deploy-tab" data-tab="pair" onclick="switchDeployTab('pair',this)" style="flex:1;padding:12px;border:none;cursor:pointer;font-family:inherit;font-size:0.82rem;font-weight:600;transition:all 0.2s;background:transparent;color:var(--muted);border-left:1px solid var(--border);border-right:1px solid var(--border)">&#128272; Pair Code</button>
+            <button class="deploy-tab" data-tab="qr" onclick="switchDeployTab('qr',this)" style="flex:1;padding:12px;border:none;cursor:pointer;font-family:inherit;font-size:0.82rem;font-weight:600;transition:all 0.2s;background:transparent;color:var(--muted)">&#9634; QR Code</button>
           </div>
+
+          <div id="deploy-session" class="deploy-panel">
+            <div style="display:grid;gap:14px">
+              <div>
+                <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Session ID</label>
+                <input type="text" id="inp-sessionId" placeholder="KnightBot!...">
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                <div>
+                  <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Bot Name</label>
+                  <input type="text" id="inp-botName" placeholder="My Bot">
+                </div>
+                <div>
+                  <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Owner Name</label>
+                  <input type="text" id="inp-ownerName" placeholder="Your Name">
+                </div>
+              </div>
+              <div>
+                <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Owner Number</label>
+                <input type="text" id="inp-ownerNumber" placeholder="94xxxxxxxxx">
+              </div>
+              <button class="btn btn-primary" style="width:100%;padding:14px;font-size:0.95rem" onclick="addSession()">Deploy Bot Instance</button>
+            </div>
+          </div>
+
+          <div id="deploy-pair" class="deploy-panel" style="display:none">
+            <div style="display:grid;gap:14px">
+              <div style="padding:14px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)">
+                <p style="font-size:0.82rem;color:var(--muted);line-height:1.6;margin:0">Enter your WhatsApp number with country code. A pairing code will be generated — enter it in <strong style="color:var(--text)">WhatsApp > Linked Devices > Link a Device > Link with phone number instead</strong>.</p>
+              </div>
+              <div>
+                <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">WhatsApp Number</label>
+                <input type="text" id="inp-pairNumber" placeholder="e.g. 15551234567 (with country code, no +)">
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                <div>
+                  <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Bot Name</label>
+                  <input type="text" id="inp-pairBotName" placeholder="My Bot">
+                </div>
+                <div>
+                  <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Owner Name</label>
+                  <input type="text" id="inp-pairOwnerName" placeholder="Your Name">
+                </div>
+              </div>
+              <div>
+                <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Owner Number (optional, defaults to pair number)</label>
+                <input type="text" id="inp-pairOwnerNumber" placeholder="94xxxxxxxxx">
+              </div>
+              <button class="btn btn-primary" style="width:100%;padding:14px;font-size:0.95rem" id="pairBtn" onclick="generatePairCode()">&#128272; Generate Pair Code</button>
+
+              <div id="pair-loading" style="display:none;text-align:center;padding:20px">
+                <div style="display:inline-block;width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--cyan);border-radius:50%;animation:spin 0.8s linear infinite"></div>
+                <p style="color:var(--muted);font-size:0.85rem;margin-top:12px">Generating pair code...</p>
+              </div>
+
+              <div id="pair-result" style="display:none">
+                <div style="padding:20px;border-radius:12px;background:var(--surface-2);border:1px solid rgba(6,182,212,0.3);text-align:center">
+                  <p style="font-size:0.75rem;color:var(--dim);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Your Pair Code</p>
+                  <div id="pair-code" style="font-family:'Orbitron',monospace;font-size:1.8rem;font-weight:700;color:var(--cyan);letter-spacing:4px;margin-bottom:12px"></div>
+                  <button class="btn btn-sm" onclick="copyPairCode()" id="copyPairBtn">Copy Code</button>
+                  <p style="font-size:0.78rem;color:var(--muted);margin-top:12px">Enter this code in WhatsApp within 60 seconds. The bot will auto-deploy once connected.</p>
+                </div>
+              </div>
+
+              <div id="pair-error" style="display:none">
+                <div style="padding:14px;border-radius:12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);text-align:center">
+                  <p style="color:var(--red);font-size:0.85rem" id="pair-error-msg"></p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="deploy-qr" class="deploy-panel" style="display:none">
+            <div style="display:grid;gap:14px">
+              <div style="padding:14px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)">
+                <p style="font-size:0.82rem;color:var(--muted);line-height:1.6;margin:0">Scan the QR code with your WhatsApp: <strong style="color:var(--text)">Settings > Linked Devices > Link a Device</strong>. The bot will auto-deploy once connected.</p>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+                <div>
+                  <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Bot Name</label>
+                  <input type="text" id="inp-qrBotName" placeholder="My Bot">
+                </div>
+                <div>
+                  <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Owner Name</label>
+                  <input type="text" id="inp-qrOwnerName" placeholder="Your Name">
+                </div>
+              </div>
+              <div>
+                <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Owner Number</label>
+                <input type="text" id="inp-qrOwnerNumber" placeholder="94xxxxxxxxx">
+              </div>
+              <button class="btn btn-primary" style="width:100%;padding:14px;font-size:0.95rem" id="qrBtn" onclick="generateQR()">&#9634; Generate QR Code</button>
+
+              <div id="qr-loading" style="display:none;text-align:center;padding:20px">
+                <div style="display:inline-block;width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--cyan);border-radius:50%;animation:spin 0.8s linear infinite"></div>
+                <p style="color:var(--muted);font-size:0.85rem;margin-top:12px">Generating QR code...</p>
+              </div>
+
+              <div id="qr-result" style="display:none;text-align:center">
+                <div style="padding:24px;border-radius:12px;background:var(--surface-2);border:1px solid rgba(6,182,212,0.3)">
+                  <img id="qr-image" src="" alt="QR Code" style="max-width:260px;border-radius:12px;margin-bottom:16px;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
+                  <p style="font-size:0.78rem;color:var(--muted)">Scan this QR code with your WhatsApp app. The bot will auto-deploy once connected.</p>
+                  <button class="btn btn-sm" style="margin-top:12px" onclick="generateQR()">Refresh QR</button>
+                </div>
+              </div>
+
+              <div id="qr-error" style="display:none">
+                <div style="padding:14px;border-radius:12px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);text-align:center">
+                  <p style="color:var(--red);font-size:0.85rem" id="qr-error-msg"></p>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -470,7 +574,9 @@ function showPage(id,el){
 async function apiFetch(url,opts){
   const res=await fetch(url,opts);
   if(res.status===401){window.location.href='/login';throw new Error('Not authenticated')}
-  return res.json();
+  const data=await res.json();
+  if(!res.ok&&data.message)throw new Error(data.message);
+  return data;
 }
 
 function logout(){
@@ -635,6 +741,93 @@ async function addSession(){
     if(data.success){toast('Bot deployed successfully!','success');showPage('sessions',document.querySelectorAll('.nav-item')[1]);loadQuickSessions()}
     else toast('Error: '+(data.message||'Deploy failed'),'error');
   }catch(e){toast('Deploy failed','error')}
+}
+
+function switchDeployTab(tab,el){
+  document.querySelectorAll('.deploy-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.deploy-panel').forEach(p=>p.style.display='none');
+  el.classList.add('active');
+  document.getElementById('deploy-'+tab).style.display='block';
+}
+
+async function generatePairCode(){
+  const num=document.getElementById('inp-pairNumber').value.trim();
+  if(!num){toast('Phone number is required','error');return}
+
+  document.getElementById('pairBtn').style.display='none';
+  document.getElementById('pair-loading').style.display='block';
+  document.getElementById('pair-result').style.display='none';
+  document.getElementById('pair-error').style.display='none';
+
+  try{
+    const data=await apiFetch('/api/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      number:num,
+      botName:document.getElementById('inp-pairBotName').value||'Infinity MD',
+      ownerName:document.getElementById('inp-pairOwnerName').value,
+      ownerNumber:document.getElementById('inp-pairOwnerNumber').value
+    })});
+    if(data.success&&data.code){
+      document.getElementById('pair-code').textContent=data.code;
+      document.getElementById('pair-result').style.display='block';
+      toast('Pair code generated! Enter it in WhatsApp.','success');
+    }else{
+      document.getElementById('pair-error-msg').textContent=data.message||'Failed to generate pair code';
+      document.getElementById('pair-error').style.display='block';
+      toast(data.message||'Failed to generate pair code','error');
+    }
+  }catch(e){
+    const msg=e.message||'Failed to generate pair code';
+    document.getElementById('pair-error-msg').textContent=msg;
+    document.getElementById('pair-error').style.display='block';
+    toast(msg,'error');
+  }finally{
+    document.getElementById('pair-loading').style.display='none';
+    document.getElementById('pairBtn').style.display='';
+  }
+}
+
+function copyPairCode(){
+  const code=document.getElementById('pair-code').textContent;
+  navigator.clipboard.writeText(code.replace(/-/g,'')).then(()=>{
+    const btn=document.getElementById('copyPairBtn');
+    btn.textContent='Copied!';
+    setTimeout(()=>{btn.textContent='Copy Code'},2000);
+  }).catch(()=>toast('Copy failed','error'));
+}
+
+async function generateQR(){
+  document.getElementById('qrBtn').style.display='none';
+  document.getElementById('qr-loading').style.display='block';
+  document.getElementById('qr-result').style.display='none';
+  document.getElementById('qr-error').style.display='none';
+
+  const params=new URLSearchParams();
+  const bn=document.getElementById('inp-qrBotName').value;
+  const on=document.getElementById('inp-qrOwnerName').value;
+  const onum=document.getElementById('inp-qrOwnerNumber').value;
+  if(bn)params.set('botName',bn);
+  if(on)params.set('ownerName',on);
+  if(onum)params.set('ownerNumber',onum);
+
+  try{
+    const data=await apiFetch('/api/qr?'+params.toString());
+    if(data.success&&data.qr){
+      document.getElementById('qr-image').src=data.qr;
+      document.getElementById('qr-result').style.display='block';
+      toast('QR code generated! Scan it with WhatsApp.','success');
+    }else{
+      document.getElementById('qr-error-msg').textContent=data.message||'Failed to generate QR code';
+      document.getElementById('qr-error').style.display='block';
+      toast(data.message||'Failed to generate QR','error');
+    }
+  }catch(e){
+    document.getElementById('qr-error-msg').textContent='Failed to generate QR code. Try again.';
+    document.getElementById('qr-error').style.display='block';
+    toast('QR generation failed','error');
+  }finally{
+    document.getElementById('qr-loading').style.display='none';
+    document.getElementById('qrBtn').style.display='';
+  }
 }
 
 async function restartSession(id){

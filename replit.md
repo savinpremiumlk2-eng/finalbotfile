@@ -61,6 +61,15 @@ Merge chain in handler.js: `globalSettings → userSettings → sessionSettings`
 - Routes: `/login`, `/signup`, `/dashboard`
 - API: `/api/sessions`, `/api/session/add|update|delete|restart`, `/api/admin/*`
 - Settings API: `/api/user-settings`, `/api/user-settings/update`, `/api/global-settings`, `/api/global-settings/update`
+- Pairing API: `/api/pair` (POST, requires phone number), `/api/qr` (GET, generates QR code)
+
+## Bot Connection Methods (Deploy Bot page)
+Three ways to connect a new bot, selectable via tabs:
+1. **Session ID** — Paste a `KnightBot!...` encoded session string (original method)
+2. **Pair Code** — Enter WhatsApp number, get an 8-digit code to enter in WhatsApp > Linked Devices > Link with phone number
+3. **QR Code** — Generate a QR code to scan from WhatsApp > Linked Devices > Link a Device
+
+All three methods auto-deploy the bot session after successful connection. Pair/QR sessions are stored with IDs prefixed `paired_` or `qr_` respectively. Temporary pairing sockets are tracked in `pairSessions` Map and cleaned up after connection or timeout.
 
 ## Environment
 - Node.js 20 on NixOS

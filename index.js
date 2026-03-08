@@ -9,7 +9,12 @@ const {
   DisconnectReason,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
+  Browsers,
+  jidNormalizedUser,
+  delay: baileysDelay,
 } = require('@whiskeysockets/baileys');
+const QRCode = require('qrcode');
+const pn = require('awesome-phonenumber');
 
 /**
  * Infinity MD - Render Web Service Stable Entry
@@ -381,6 +386,260 @@ app.post('/api/session/add', isAuthenticated, async (req, res) => {
   } catch (error) {
     console.error('Session Add Error:', error);
     res.status(500).send(error.message);
+  }
+});
+
+const pairSessions = new Map();
+
+app.post('/api/pair', isAuthenticated, async (req, res) => {
+  const { number, botName, ownerName, ownerNumber } = req.body;
+  if (!number) return res.status(400).json({ success: false, message: 'Phone number is required' });
+
+  const cleaned = number.replace(/[^0-9]/g, '');
+  const phone = pn('+' + cleaned);
+  if (!phone.isValid()) {
+    return res.status(400).json({ success: false, message: 'Invalid phone number. Enter your full international number (e.g., 15551234567 for US, 447911123456 for UK) without + or spaces.' });
+  }
+  const num = phone.getNumber('e164').replace('+', '');
+
+  const pairId = `pair_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  const pairDir = path.join(__dirname, 'session', pairId);
+  fs.mkdirSync(pairDir, { recursive: true });
+
+  try {
+    const { state, saveCreds } = await useMultiFileAuthState(pairDir);
+    const { version } = await fetchLatestBaileysVersion();
+
+    const pairSock = makeWASocket({
+      version,
+      auth: {
+        creds: state.creds,
+        keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'fatal' }).child({ level: 'fatal' })),
+      },
+      printQRInTerminal: false,
+      logger: pino({ level: 'fatal' }).child({ level: 'fatal' }),
+      browser: Browsers.windows('Chrome'),
+      markOnlineOnConnect: false,
+      generateHighQualityLinkPreview: false,
+      defaultQueryTimeoutMs: 60000,
+      connectTimeoutMs: 60000,
+      keepAliveIntervalMs: 30000,
+    });
+
+    pairSessions.set(pairId, pairSock);
+
+    pairSock.ev.on('creds.update', saveCreds);
+
+    pairSock.ev.on('connection.update', async (update) => {
+      const { connection, lastDisconnect } = update;
+
+      if (connection === 'open') {
+        console.log(`✅ Pair session ${pairId} connected!`);
+        try {
+          const credsData = fs.readFileSync(path.join(pairDir, 'creds.json'), 'utf8');
+
+          const sessionName = `session_${Date.now()}`;
+          const sessionFolder = path.join(__dirname, 'session', sessionName);
+          fs.mkdirSync(sessionFolder, { recursive: true });
+
+          const files = fs.readdirSync(pairDir);
+          for (const f of files) {
+            fs.copyFileSync(path.join(pairDir, f), path.join(sessionFolder, f));
+          }
+
+          const sessionId = `paired_${num}_${Date.now()}`;
+          const sessionData = {
+            userId: req.session.username,
+            folder: sessionName,
+            name: botName || 'Infinity MD',
+            ownerName: ownerName || config.ownerName[0],
+            ownerNumber: ownerNumber || num,
+            addedAt: Date.now(),
+            creds: credsData
+          };
+          await database.saveSession(sessionId, sessionData);
+          await connectSession(sessionId, sessionData);
+
+          console.log(`✅ Pair session auto-deployed as ${sessionId}`);
+        } catch (err) {
+          console.error('Error deploying pair session:', err);
+        }
+
+        setTimeout(() => {
+          try { pairSock.end(); } catch (_) {}
+          pairSessions.delete(pairId);
+          fs.rmSync(pairDir, { recursive: true, force: true });
+        }, 5000);
+      }
+
+      if (connection === 'close') {
+        const statusCode = lastDisconnect?.error?.output?.statusCode;
+        if (statusCode !== 401) {
+          setTimeout(() => {
+            pairSessions.delete(pairId);
+            fs.rmSync(pairDir, { recursive: true, force: true });
+          }, 2000);
+        }
+      }
+    });
+
+    if (!pairSock.authState.creds.registered) {
+      await baileysDelay(3000);
+      try {
+        let code = await pairSock.requestPairingCode(num);
+        code = code?.match(/.{1,4}/g)?.join('-') || code;
+        console.log(`🔑 Pair code for ${num}: ${code}`);
+
+        setTimeout(() => {
+          if (pairSessions.has(pairId)) {
+            console.log(`⏰ Pair session ${pairId} timed out, cleaning up`);
+            try { pairSessions.get(pairId).end(); } catch (_) {}
+            pairSessions.delete(pairId);
+            fs.rmSync(pairDir, { recursive: true, force: true });
+          }
+        }, 120000);
+
+        return res.json({ success: true, code, pairId });
+      } catch (err) {
+        console.error('Error requesting pair code:', err);
+        pairSessions.delete(pairId);
+        fs.rmSync(pairDir, { recursive: true, force: true });
+        return res.status(503).json({ success: false, message: 'Failed to generate pair code. Check the phone number and try again.' });
+      }
+    } else {
+      pairSessions.delete(pairId);
+      fs.rmSync(pairDir, { recursive: true, force: true });
+      return res.status(400).json({ success: false, message: 'This number already has an active session.' });
+    }
+  } catch (err) {
+    console.error('Pair session error:', err);
+    fs.rmSync(pairDir, { recursive: true, force: true });
+    return res.status(503).json({ success: false, message: 'Service unavailable' });
+  }
+});
+
+app.get('/api/qr', isAuthenticated, async (req, res) => {
+  const qrId = `qr_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  const qrDir = path.join(__dirname, 'session', qrId);
+  fs.mkdirSync(qrDir, { recursive: true });
+
+  let responseSent = false;
+
+  try {
+    const { state, saveCreds } = await useMultiFileAuthState(qrDir);
+    const { version } = await fetchLatestBaileysVersion();
+
+    const qrSock = makeWASocket({
+      version,
+      logger: pino({ level: 'silent' }),
+      browser: Browsers.windows('Chrome'),
+      auth: {
+        creds: state.creds,
+        keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'fatal' }).child({ level: 'fatal' })),
+      },
+      markOnlineOnConnect: false,
+      generateHighQualityLinkPreview: false,
+      defaultQueryTimeoutMs: 60000,
+      connectTimeoutMs: 60000,
+      keepAliveIntervalMs: 30000,
+    });
+
+    pairSessions.set(qrId, qrSock);
+
+    const botName = req.query.botName || 'Infinity MD';
+    const ownerName = req.query.ownerName || config.ownerName[0];
+    const ownerNumber = req.query.ownerNumber || config.ownerNumber[0];
+
+    qrSock.ev.on('creds.update', saveCreds);
+
+    qrSock.ev.on('connection.update', async (update) => {
+      const { connection, lastDisconnect, qr } = update;
+
+      if (qr && !responseSent) {
+        responseSent = true;
+        try {
+          const qrDataURL = await QRCode.toDataURL(qr, {
+            errorCorrectionLevel: 'M',
+            type: 'image/png',
+            quality: 0.92,
+            margin: 1,
+            color: { dark: '#06b6d4', light: '#0f172a' }
+          });
+          res.json({ success: true, qr: qrDataURL, qrId });
+        } catch (qrErr) {
+          res.status(500).json({ success: false, message: 'Failed to generate QR code' });
+        }
+      }
+
+      if (connection === 'open') {
+        console.log(`✅ QR session ${qrId} connected!`);
+        try {
+          const credsData = fs.readFileSync(path.join(qrDir, 'creds.json'), 'utf8');
+
+          const userJid = qrSock.authState.creds.me?.id
+            ? jidNormalizedUser(qrSock.authState.creds.me.id)
+            : null;
+          const userNum = userJid ? userJid.split('@')[0] : '';
+
+          const sessionName = `session_${Date.now()}`;
+          const sessionFolder = path.join(__dirname, 'session', sessionName);
+          fs.mkdirSync(sessionFolder, { recursive: true });
+
+          const files = fs.readdirSync(qrDir);
+          for (const f of files) {
+            if (fs.statSync(path.join(qrDir, f)).isFile()) {
+              fs.copyFileSync(path.join(qrDir, f), path.join(sessionFolder, f));
+            }
+          }
+
+          const sessionId = `qr_${userNum || Date.now()}_${Date.now()}`;
+          const sessionData = {
+            userId: req.session.username,
+            folder: sessionName,
+            name: botName,
+            ownerName: ownerName,
+            ownerNumber: ownerNumber || userNum,
+            addedAt: Date.now(),
+            creds: credsData
+          };
+          await database.saveSession(sessionId, sessionData);
+          await connectSession(sessionId, sessionData);
+
+          console.log(`✅ QR session auto-deployed as ${sessionId}`);
+        } catch (err) {
+          console.error('Error deploying QR session:', err);
+        }
+
+        setTimeout(() => {
+          try { qrSock.end(); } catch (_) {}
+          pairSessions.delete(qrId);
+          fs.rmSync(qrDir, { recursive: true, force: true });
+        }, 5000);
+      }
+
+      if (connection === 'close') {
+        pairSessions.delete(qrId);
+        fs.rmSync(qrDir, { recursive: true, force: true });
+      }
+    });
+
+    setTimeout(() => {
+      if (!responseSent) {
+        responseSent = true;
+        res.status(408).json({ success: false, message: 'QR generation timed out. Try again.' });
+        try { qrSock.end(); } catch (_) {}
+        pairSessions.delete(qrId);
+        fs.rmSync(qrDir, { recursive: true, force: true });
+      }
+    }, 30000);
+
+  } catch (err) {
+    console.error('QR session error:', err);
+    if (!responseSent) {
+      responseSent = true;
+      res.status(503).json({ success: false, message: 'Service unavailable' });
+    }
+    fs.rmSync(qrDir, { recursive: true, force: true });
   }
 });
 

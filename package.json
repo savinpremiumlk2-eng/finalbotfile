@@ -25,6 +25,7 @@
         "@hapi/boom": "^10.0.1",
         "@vitalets/google-translate-api": "^9.2.1",
         "@whiskeysockets/baileys": "^v7.0.0-rc.9",
+        "awesome-phonenumber": "^7.8.0",
         "axios": "^1.13.6",
         "canvas": "^3.2.1",
         "cheerio": "^1.2.0",
