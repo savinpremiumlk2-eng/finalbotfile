@@ -59,7 +59,8 @@ startCleanup();
 
 app.get('/health', (req, res) => res.status(200).send('OK'));
 app.get('/', (req, res) => {
-  if (req.headers['user-agent'] && req.headers['user-agent'].includes('Go-http-client')) {
+  const ua = (req.headers['user-agent'] || '').toLowerCase();
+  if (!ua || !ua.includes('mozilla')) {
     return res.status(200).send('OK');
   }
   return res.redirect('/login');
