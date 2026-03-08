@@ -388,6 +388,10 @@ async function connectSession(id, sessionData) {
 
   newSock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
+    if (!handler || typeof handler.handleMessage !== 'function') {
+      console.error('Handler not loaded - cannot process messages');
+      return;
+    }
     for (const msg of messages) {
       if (!msg?.message) continue;
       try { await handler.handleMessage(newSock, msg); } catch (err) { console.error('Handler Error:', err); }
