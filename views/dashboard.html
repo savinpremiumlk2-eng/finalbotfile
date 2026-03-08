@@ -93,6 +93,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 /* Grid layouts */
 .grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px}
 .grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+.form-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 
 /* Buttons */
 .btn{
@@ -188,22 +189,65 @@ textarea{resize:vertical;min-height:80px}
 
 /* Mobile */
 .mobile-toggle{display:none;position:fixed;top:16px;left:16px;z-index:200;background:var(--surface);border:1px solid var(--border);padding:10px;border-radius:10px;color:var(--text);cursor:pointer;font-size:1.2rem}
+.sidebar-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:99;backdrop-filter:blur(2px)}
+
 @media(max-width:768px){
   .sidebar{transform:translateX(-100%)}
   .sidebar.open{transform:translateX(0)}
+  .sidebar.open~.sidebar-overlay,.sidebar-overlay.active{display:block}
   .main{margin-left:0}
   .mobile-toggle{display:block}
-  .content{padding:20px 16px}
-  .topbar{padding:16px}
-  .stats-grid{grid-template-columns:1fr 1fr}
+  .topbar{padding:12px 16px;padding-left:56px}
+  .topbar-title{font-size:0.95rem}
+  .content{padding:16px 12px}
+
+  .stats-grid{grid-template-columns:1fr 1fr;gap:10px}
+  .stat-card{padding:14px}
+  .stat-card .stat-value{font-size:1.3rem}
+  .stat-card .stat-label{font-size:0.65rem}
+  .stat-card .stat-icon{font-size:1.2rem;margin-bottom:8px}
+
   .grid-2{grid-template-columns:1fr}
+  .grid-3{grid-template-columns:1fr 1fr}
   .edit-panel .form-grid{grid-template-columns:1fr}
+
+  .card{padding:16px;margin-bottom:16px;border-radius:12px}
+  .card-header{flex-direction:column;align-items:flex-start;gap:8px}
+
+  .session-card{padding:14px}
+  .session-actions{gap:6px}
+  .session-actions .btn{padding:6px 10px;font-size:0.75rem}
+
+  .toggle-row{gap:8px}
+  .toggle-label{padding:6px 10px;font-size:0.78rem}
+
+  .toast-container{top:12px;right:12px;left:12px}
+  .toast{min-width:auto;font-size:0.8rem;padding:10px 14px}
+
+  .deploy-tab,.deploy-tab:first-child,.deploy-tab:last-child{font-size:0.72rem !important;padding:10px 4px !important}
+
+  .user-info{padding:6px 10px}
+  .user-avatar{width:32px;height:32px;font-size:0.75rem}
+  .user-details .name{font-size:0.8rem}
+
+  .list-item{flex-direction:column;align-items:flex-start;gap:8px}
+  .list-item>div{width:100%}
+  .list-item>div:last-child{display:flex;justify-content:flex-end}
+  .form-cols{grid-template-columns:1fr}
+}
+
+@media(max-width:400px){
+  .stats-grid{grid-template-columns:1fr}
+  .grid-3{grid-template-columns:1fr}
+  .topbar-actions .btn{padding:5px 8px;font-size:0.72rem}
+  .stat-card .stat-value{font-size:1.5rem}
 }
 </style>
 </head>
 <body>
 
-<button class="mobile-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">&#9776;</button>
+<button class="mobile-toggle" onclick="toggleSidebar()">&#9776;</button>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 <div class="toast-container" id="toasts"></div>
 
 <div class="layout">
@@ -389,7 +433,7 @@ textarea{resize:vertical;min-height:80px}
                 <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Session ID</label>
                 <input type="text" id="inp-sessionId" placeholder="KnightBot!...">
               </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div class="form-cols">
                 <div>
                   <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Bot Name</label>
                   <input type="text" id="inp-botName" placeholder="My Bot">
@@ -639,6 +683,17 @@ textarea{resize:vertical;min-height:80px}
 <script>
 let currentUser=null;
 
+function toggleSidebar(){
+  const sb=document.querySelector('.sidebar');
+  const ov=document.getElementById('sidebarOverlay');
+  sb.classList.toggle('open');
+  ov.classList.toggle('active');
+}
+function closeSidebar(){
+  document.querySelector('.sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('active');
+}
+
 function toast(msg,type='info'){
   const c=document.getElementById('toasts');
   const t=document.createElement('div');
@@ -655,7 +710,7 @@ function showPage(id,el){
   if(el)el.classList.add('active');
   const titles={overview:'Overview',sessions:'Bot Sessions',deploy:'Deploy Bot',settings:'Settings',admin:'Admin Panel'};
   document.getElementById('pageTitle').textContent=titles[id]||id;
-  document.querySelector('.sidebar').classList.remove('open');
+  closeSidebar();
   if(id==='sessions')renderSessions();
   if(id==='admin')loadAdminData();
 }
