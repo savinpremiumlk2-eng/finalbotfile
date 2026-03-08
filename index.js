@@ -20,6 +20,18 @@ const pn = require('awesome-phonenumber');
  * Infinity MD - Render Web Service Stable Entry
  */
 
+process.on('uncaughtException', (err) => {
+  const msg = err?.message || '';
+  if (msg.includes('Decipheriv') || msg.includes('Bad MAC') || msg.includes('decrypt')) {
+    console.error('⚠️ Caught Baileys decryption error (non-fatal):', msg);
+  } else {
+    console.error('⚠️ Uncaught exception (kept alive):', err);
+  }
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('⚠️ Unhandled rejection (kept alive):', reason?.message || reason);
+});
+
 const app = express();
 const logger = pino({ level: 'silent' });
 const activeSessions = new Map();
@@ -292,6 +304,12 @@ async function connectSession(id, sessionData) {
      settings: sessionData.settings || {},
      userId: sessionData.userId
   };
+
+  if (newSock.ws) {
+    newSock.ws.on('error', (err) => {
+      console.error(`⚠️ WebSocket error for session ${id.substring(0, 20)}...:`, err?.message || err);
+    });
+  }
 
   newSock.ev.on('creds.update', async () => {
     await saveCreds();
