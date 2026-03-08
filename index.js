@@ -1,23 +1,10 @@
-const pino = require('pino');
-const { Boom } = require('@hapi/boom');
 const fs = require('fs');
 const path = require('path');
 const express = require('express');
-const {
-  default: makeWASocket,
-  useMultiFileAuthState,
-  DisconnectReason,
-  fetchLatestBaileysVersion,
-  makeCacheableSignalKeyStore,
-  Browsers,
-  jidNormalizedUser,
-  delay: baileysDelay,
-} = require('@whiskeysockets/baileys');
-const QRCode = require('qrcode');
-const pn = require('awesome-phonenumber');
 
 /**
  * Infinity MD - Render Web Service Stable Entry
+ * Server starts FIRST, then loads heavy modules so deploy healthchecks pass immediately.
  */
 
 process.on('uncaughtException', (err) => {
@@ -33,11 +20,14 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const app = express();
-const logger = pino({ level: 'silent' });
 const activeSessions = new Map();
 const sessionsDbPath = path.join(__dirname, 'database', 'sessions.json');
 let serverReady = false;
-const session = require('express-session');
+
+let pino, Boom, makeWASocket, useMultiFileAuthState, DisconnectReason,
+    fetchLatestBaileysVersion, makeCacheableSignalKeyStore, Browsers,
+    jidNormalizedUser, baileysDelay, QRCode, pn, logger;
+let config, handler, database, auth;
 
 app.get('/', (req, res) => {
   if (!serverReady) return res.status(200).send('OK');
@@ -45,7 +35,7 @@ app.get('/', (req, res) => {
 });
 
 app.use(express.json());
-app.use(session({
+app.use(require('express-session')({
   secret: 'infinity-md-secret',
   resave: false,
   saveUninitialized: true,
@@ -57,6 +47,22 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('✅ Web server listening on', PORT);
 
   setTimeout(() => {
+    pino = require('pino');
+    ({ Boom } = require('@hapi/boom'));
+    ({
+      default: makeWASocket,
+      useMultiFileAuthState,
+      DisconnectReason,
+      fetchLatestBaileysVersion,
+      makeCacheableSignalKeyStore,
+      Browsers,
+      jidNormalizedUser,
+      delay: baileysDelay,
+    } = require('@whiskeysockets/baileys'));
+    QRCode = require('qrcode');
+    pn = require('awesome-phonenumber');
+    logger = pino({ level: 'silent' });
+
     if (!fs.existsSync(path.join(__dirname, 'session'))) {
       fs.mkdirSync(path.join(__dirname, 'session'), { recursive: true });
     }
@@ -95,8 +101,6 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     initSessions();
   }, 0);
 });
-
-let config, handler, database, auth;
 
 const isAuthenticated = (req, res, next) => {
   if (!serverReady) {
