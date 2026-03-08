@@ -65,11 +65,13 @@ Merge chain in handler.js: `globalSettings → userSettings → sessionSettings`
 ## Web Dashboard
 - Port 3000 (default), PORT=5000 set in dev workflow for Replit webview
 - Deployment: VM target (always-on), uses port 3000
-- Health endpoint: `/health` returns 200 OK
+- Root `/` returns 200 with client-side redirect to `/login` (ensures deploy healthchecks pass)
+- Global JSON error handler catches unhandled Express errors (prevents HTML error responses)
 - Routes: `/login`, `/signup`, `/dashboard`
 - API: `/api/sessions`, `/api/session/add|update|delete|restart`, `/api/admin/*`
 - Settings API: `/api/user-settings`, `/api/user-settings/update`, `/api/global-settings`, `/api/global-settings/update`
 - Pairing API: `/api/pair` (POST, requires phone number), `/api/qr` (GET, generates QR code)
+- `apiFetch()` in dashboard checks content-type before parsing JSON to avoid cryptic errors
 
 ## Bot Connection Methods (Deploy Bot page)
 Three ways to connect a new bot, selectable via tabs:

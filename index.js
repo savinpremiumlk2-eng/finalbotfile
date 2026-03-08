@@ -38,7 +38,6 @@ const activeSessions = new Map();
 const sessionsDbPath = path.join(__dirname, 'database', 'sessions.json');
 let serverReady = false;
 
-app.get('/health', (req, res) => res.status(200).send('OK'));
 app.get('/', (req, res) => {
   res.status(200).send('<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=/login"><title>Infinity MD</title></head><body>OK</body></html>');
 });
@@ -441,11 +440,19 @@ app.post('/api/pair', isAuthenticated, async (req, res) => {
   if (!number) return res.status(400).json({ success: false, message: 'Phone number is required' });
 
   const cleaned = number.replace(/[^0-9]/g, '');
-  const phone = pn('+' + cleaned);
-  if (!phone.isValid()) {
+  if (!cleaned || cleaned.length < 7 || cleaned.length > 15) {
     return res.status(400).json({ success: false, message: 'Invalid phone number. Enter your full international number (e.g., 15551234567 for US, 447911123456 for UK) without + or spaces.' });
   }
-  const num = phone.getNumber('e164').replace('+', '');
+  let num;
+  try {
+    const phone = pn('+' + cleaned);
+    if (!phone.isValid()) {
+      return res.status(400).json({ success: false, message: 'Invalid phone number. Enter your full international number (e.g., 15551234567 for US, 447911123456 for UK) without + or spaces.' });
+    }
+    num = phone.getNumber('e164').replace('+', '');
+  } catch (phoneErr) {
+    num = cleaned;
+  }
 
   const pairId = `pair_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
   const pairDir = path.join(__dirname, 'session', pairId);
@@ -475,10 +482,13 @@ app.post('/api/pair', isAuthenticated, async (req, res) => {
 
     pairSock.ev.on('creds.update', saveCreds);
 
+    let pairDeployed = false;
+
     pairSock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect } = update;
 
       if (connection === 'open') {
+        pairDeployed = true;
         console.log(`✅ Pair session ${pairId} connected!`);
         try {
           const credsData = fs.readFileSync(path.join(pairDir, 'creds.json'), 'utf8');
@@ -489,7 +499,9 @@ app.post('/api/pair', isAuthenticated, async (req, res) => {
 
           const files = fs.readdirSync(pairDir);
           for (const f of files) {
-            fs.copyFileSync(path.join(pairDir, f), path.join(sessionFolder, f));
+            if (fs.statSync(path.join(pairDir, f)).isFile()) {
+              fs.copyFileSync(path.join(pairDir, f), path.join(sessionFolder, f));
+            }
           }
 
           const sessionId = `paired_${num}_${Date.now()}`;
@@ -517,13 +529,92 @@ app.post('/api/pair', isAuthenticated, async (req, res) => {
         }, 5000);
       }
 
-      if (connection === 'close') {
-        const statusCode = lastDisconnect?.error?.output?.statusCode;
-        if (statusCode !== 401) {
-          setTimeout(() => {
+      if (connection === 'close' && !pairDeployed) {
+        const statusCode = (lastDisconnect?.error instanceof Boom)
+          ? lastDisconnect.error.output?.statusCode
+          : lastDisconnect?.error?.output?.statusCode;
+        const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
+
+        if (isLoggedOut) {
+          console.log(`❌ Pair session ${pairId} logged out, cleaning up`);
+          pairSessions.delete(pairId);
+          try { fs.rmSync(pairDir, { recursive: true, force: true }); } catch (_) {}
+        } else {
+          console.log(`🔄 Pair session ${pairId} disconnected (status: ${statusCode}), retrying...`);
+          try {
+            try { pairSock.ev.removeAllListeners(); pairSock.end(); } catch (_) {}
+            const { state: newState, saveCreds: newSaveCreds } = await useMultiFileAuthState(pairDir);
+            const { version: newVersion } = await fetchLatestBaileysVersion();
+
+            const retrySock = makeWASocket({
+              version: newVersion,
+              auth: {
+                creds: newState.creds,
+                keys: makeCacheableSignalKeyStore(newState.keys, pino({ level: 'fatal' }).child({ level: 'fatal' })),
+              },
+              printQRInTerminal: false,
+              logger: pino({ level: 'fatal' }).child({ level: 'fatal' }),
+              browser: Browsers.windows('Chrome'),
+              markOnlineOnConnect: false,
+              generateHighQualityLinkPreview: false,
+              defaultQueryTimeoutMs: 60000,
+              connectTimeoutMs: 60000,
+              keepAliveIntervalMs: 30000,
+            });
+
+            retrySock.ev.on('creds.update', newSaveCreds);
+            retrySock.ev.on('connection.update', async (retryUpdate) => {
+              const { connection: rc, lastDisconnect: rld } = retryUpdate;
+              if (rc === 'open') {
+                pairDeployed = true;
+                console.log(`✅ Pair session ${pairId} connected on retry!`);
+                try {
+                  const credsData = fs.readFileSync(path.join(pairDir, 'creds.json'), 'utf8');
+                  const sessionName = `session_${Date.now()}`;
+                  const sessionFolder = path.join(__dirname, 'session', sessionName);
+                  fs.mkdirSync(sessionFolder, { recursive: true });
+                  const files = fs.readdirSync(pairDir);
+                  for (const f of files) {
+                    if (fs.statSync(path.join(pairDir, f)).isFile()) {
+                      fs.copyFileSync(path.join(pairDir, f), path.join(sessionFolder, f));
+                    }
+                  }
+                  const sessionId = `paired_${num}_${Date.now()}`;
+                  const sessionData = {
+                    userId: req.session.username,
+                    folder: sessionName,
+                    name: botName || 'Infinity MD',
+                    ownerName: ownerName || config.ownerName[0],
+                    ownerNumber: ownerNumber || num,
+                    addedAt: Date.now(),
+                    creds: credsData
+                  };
+                  await database.saveSession(sessionId, sessionData);
+                  await connectSession(sessionId, sessionData);
+                  console.log(`✅ Pair session auto-deployed as ${sessionId}`);
+                } catch (err) {
+                  console.error('Error deploying pair retry session:', err);
+                }
+                setTimeout(() => {
+                  try { retrySock.end(); } catch (_) {}
+                  pairSessions.delete(pairId);
+                  fs.rmSync(pairDir, { recursive: true, force: true });
+                }, 5000);
+              }
+              if (rc === 'close' && !pairDeployed) {
+                const rCode = (rld?.error instanceof Boom) ? rld.error.output?.statusCode : rld?.error?.output?.statusCode;
+                console.log(`❌ Pair session ${pairId} retry also closed (status: ${rCode}), cleaning up`);
+                pairSessions.delete(pairId);
+                try { fs.rmSync(pairDir, { recursive: true, force: true }); } catch (_) {}
+              }
+            });
+
+            pairSessions.set(pairId, retrySock);
+          } catch (retryErr) {
+            console.error(`❌ Pair session ${pairId} retry failed:`, retryErr.message);
             pairSessions.delete(pairId);
-            fs.rmSync(pairDir, { recursive: true, force: true });
-          }, 2000);
+            try { fs.rmSync(pairDir, { recursive: true, force: true }); } catch (_) {}
+          }
         }
       }
     });
@@ -597,6 +688,8 @@ app.get('/api/qr', isAuthenticated, async (req, res) => {
 
     qrSock.ev.on('creds.update', saveCreds);
 
+    let qrDeployed = false;
+
     qrSock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect, qr } = update;
 
@@ -617,6 +710,7 @@ app.get('/api/qr', isAuthenticated, async (req, res) => {
       }
 
       if (connection === 'open') {
+        qrDeployed = true;
         console.log(`✅ QR session ${qrId} connected!`);
         try {
           const credsData = fs.readFileSync(path.join(qrDir, 'creds.json'), 'utf8');
@@ -662,9 +756,96 @@ app.get('/api/qr', isAuthenticated, async (req, res) => {
         }, 5000);
       }
 
-      if (connection === 'close') {
-        pairSessions.delete(qrId);
-        fs.rmSync(qrDir, { recursive: true, force: true });
+      if (connection === 'close' && !qrDeployed) {
+        const statusCode = (lastDisconnect?.error instanceof Boom)
+          ? lastDisconnect.error.output?.statusCode
+          : lastDisconnect?.error?.output?.statusCode;
+        const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
+
+        if (isLoggedOut) {
+          console.log(`❌ QR session ${qrId} logged out, cleaning up`);
+          pairSessions.delete(qrId);
+          try { fs.rmSync(qrDir, { recursive: true, force: true }); } catch (_) {}
+        } else {
+          console.log(`🔄 QR session ${qrId} disconnected (status: ${statusCode}), retrying...`);
+          try {
+            try { qrSock.ev.removeAllListeners(); qrSock.end(); } catch (_) {}
+            const { state: newState, saveCreds: newSaveCreds } = await useMultiFileAuthState(qrDir);
+            const { version: newVersion } = await fetchLatestBaileysVersion();
+
+            const retrySock = makeWASocket({
+              version: newVersion,
+              logger: pino({ level: 'silent' }),
+              browser: Browsers.windows('Chrome'),
+              auth: {
+                creds: newState.creds,
+                keys: makeCacheableSignalKeyStore(newState.keys, pino({ level: 'fatal' }).child({ level: 'fatal' })),
+              },
+              markOnlineOnConnect: false,
+              generateHighQualityLinkPreview: false,
+              defaultQueryTimeoutMs: 60000,
+              connectTimeoutMs: 60000,
+              keepAliveIntervalMs: 30000,
+            });
+
+            retrySock.ev.on('creds.update', newSaveCreds);
+            retrySock.ev.on('connection.update', async (retryUpdate) => {
+              const { connection: rc, lastDisconnect: rld } = retryUpdate;
+              if (rc === 'open') {
+                qrDeployed = true;
+                console.log(`✅ QR session ${qrId} connected on retry!`);
+                try {
+                  const credsData = fs.readFileSync(path.join(qrDir, 'creds.json'), 'utf8');
+                  const userJid = retrySock.authState.creds.me?.id
+                    ? jidNormalizedUser(retrySock.authState.creds.me.id)
+                    : null;
+                  const userNum = userJid ? userJid.split('@')[0] : '';
+                  const sessionName = `session_${Date.now()}`;
+                  const sessionFolder = path.join(__dirname, 'session', sessionName);
+                  fs.mkdirSync(sessionFolder, { recursive: true });
+                  const files = fs.readdirSync(qrDir);
+                  for (const f of files) {
+                    if (fs.statSync(path.join(qrDir, f)).isFile()) {
+                      fs.copyFileSync(path.join(qrDir, f), path.join(sessionFolder, f));
+                    }
+                  }
+                  const sessionId = `qr_${userNum || Date.now()}_${Date.now()}`;
+                  const sessionData = {
+                    userId: req.session.username,
+                    folder: sessionName,
+                    name: botName,
+                    ownerName: ownerName,
+                    ownerNumber: ownerNumber || userNum,
+                    addedAt: Date.now(),
+                    creds: credsData
+                  };
+                  await database.saveSession(sessionId, sessionData);
+                  await connectSession(sessionId, sessionData);
+                  console.log(`✅ QR session auto-deployed as ${sessionId}`);
+                } catch (err) {
+                  console.error('Error deploying QR retry session:', err);
+                }
+                setTimeout(() => {
+                  try { retrySock.end(); } catch (_) {}
+                  pairSessions.delete(qrId);
+                  fs.rmSync(qrDir, { recursive: true, force: true });
+                }, 5000);
+              }
+              if (rc === 'close' && !qrDeployed) {
+                const rCode = (rld?.error instanceof Boom) ? rld.error.output?.statusCode : rld?.error?.output?.statusCode;
+                console.log(`❌ QR session ${qrId} retry also closed (status: ${rCode}), cleaning up`);
+                pairSessions.delete(qrId);
+                try { fs.rmSync(qrDir, { recursive: true, force: true }); } catch (_) {}
+              }
+            });
+
+            pairSessions.set(qrId, retrySock);
+          } catch (retryErr) {
+            console.error(`❌ QR session ${qrId} retry failed:`, retryErr.message);
+            pairSessions.delete(qrId);
+            try { fs.rmSync(qrDir, { recursive: true, force: true }); } catch (_) {}
+          }
+        }
       }
     });
 
@@ -672,11 +853,13 @@ app.get('/api/qr', isAuthenticated, async (req, res) => {
       if (!responseSent) {
         responseSent = true;
         res.status(408).json({ success: false, message: 'QR generation timed out. Try again.' });
-        try { qrSock.end(); } catch (_) {}
-        pairSessions.delete(qrId);
-        fs.rmSync(qrDir, { recursive: true, force: true });
       }
-    }, 30000);
+      if (!qrDeployed) {
+        try { const s = pairSessions.get(qrId); if (s) s.end(); } catch (_) {}
+        pairSessions.delete(qrId);
+        try { fs.rmSync(qrDir, { recursive: true, force: true }); } catch (_) {}
+      }
+    }, 60000);
 
   } catch (err) {
     console.error('QR session error:', err);
@@ -931,10 +1114,12 @@ app.get('/api/stats', isAuthenticated, (req, res) => {
   });
 });
 
-setInterval(() => {
-  const http = require('http');
-  http.get(`http://127.0.0.1:${PORT}/health`, () => {}).on('error', () => {});
-}, 4 * 60 * 1000);
+
+app.use((err, req, res, next) => {
+  console.error('Unhandled Express error:', err.message || err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ success: false, message: 'Internal server error' });
+});
 
 process.on('SIGINT', () => {
   console.log('⚠️ Received SIGINT, shutting down gracefully...');
