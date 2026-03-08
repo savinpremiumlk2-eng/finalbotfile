@@ -50,12 +50,17 @@ server.listen(PORT, '0.0.0.0', () => {
       res.status(200).send('<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=/login"><title>Infinity MD</title></head><body>OK</body></html>');
     });
 
+    app.set('trust proxy', 1);
     app.use(express.json());
     app.use(require('express-session')({
       secret: 'infinity-md-secret',
       resave: false,
-      saveUninitialized: true,
-      cookie: { secure: false }
+      saveUninitialized: false,
+      cookie: {
+        secure: false,
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000
+      }
     }));
 
     pino = require('pino');

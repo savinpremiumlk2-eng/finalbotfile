@@ -4,7 +4,7 @@ const fs = require('fs');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: false,
+  ssl: process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT ? { rejectUnauthorized: false } : false,
 });
 
 let globalSettingsCache = {
