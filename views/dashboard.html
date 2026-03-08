@@ -341,7 +341,7 @@ textarea{resize:vertical;min-height:80px}
               </div>
               <div style="padding:16px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)">
                 <h3 style="font-size:0.9rem;color:var(--cyan);margin-bottom:10px">Key Commands</h3>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.82rem">
+                <div class="form-cols" style="gap:8px;font-size:0.82rem">
                   <div style="color:var(--muted)"><code style="color:var(--cyan)">.menu</code> - Main menu (reply with number)</div>
                   <div style="color:var(--muted)"><code style="color:var(--cyan)">.settings</code> - View/change bot settings</div>
                   <div style="color:var(--muted)"><code style="color:var(--cyan)">.mode</code> - Switch private/public mode</div>
@@ -376,7 +376,7 @@ textarea{resize:vertical;min-height:80px}
               </div>
               <div style="padding:16px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)">
                 <h3 style="font-size:0.9rem;color:var(--cyan);margin-bottom:10px">ප්‍රධාන විධාන</h3>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.82rem">
+                <div class="form-cols" style="gap:8px;font-size:0.82rem">
                   <div style="color:var(--muted)"><code style="color:var(--cyan)">.menu</code> - ප්‍රධාන මෙනුව (අංකයෙන් reply කරන්න)</div>
                   <div style="color:var(--muted)"><code style="color:var(--cyan)">.settings</code> - බොට් සැකසුම් බලන්න/වෙනස් කරන්න</div>
                   <div style="color:var(--muted)"><code style="color:var(--cyan)">.mode</code> - Private/Public මාදිලිය මාරු කරන්න</div>
@@ -460,7 +460,7 @@ textarea{resize:vertical;min-height:80px}
                 <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">WhatsApp Number</label>
                 <input type="text" id="inp-pairNumber" placeholder="e.g. 15551234567 (with country code, no +)">
               </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div class="form-cols">
                 <div>
                   <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Bot Name</label>
                   <input type="text" id="inp-pairBotName" placeholder="My Bot">
@@ -503,7 +503,7 @@ textarea{resize:vertical;min-height:80px}
               <div style="padding:14px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)">
                 <p style="font-size:0.82rem;color:var(--muted);line-height:1.6;margin:0">Scan the QR code with your WhatsApp: <strong style="color:var(--text)">Settings > Linked Devices > Link a Device</strong>. The bot will auto-deploy once connected.</p>
               </div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div class="form-cols">
                 <div>
                   <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Bot Name</label>
                   <input type="text" id="inp-qrBotName" placeholder="My Bot">
@@ -561,7 +561,7 @@ textarea{resize:vertical;min-height:80px}
             <label class="toggle-label"><input type="checkbox" id="u-autoTyping"> Auto-Typing</label>
             <label class="toggle-label"><input type="checkbox" id="u-autoVoice"> Auto-Voice</label>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
+          <div class="form-cols" style="margin-bottom:20px">
             <div>
               <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600">SRC Mode</label>
               <select id="u-srcMode">
@@ -596,7 +596,7 @@ textarea{resize:vertical;min-height:80px}
             <label class="toggle-label"><input type="checkbox" id="g-autoStatus"> Auto-Status</label>
             <label class="toggle-label"><input type="checkbox" id="g-antiviewonce"> Anti-ViewOnce</label>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
+          <div class="form-cols" style="margin-bottom:20px">
             <div>
               <label style="font-size:0.75rem;color:var(--dim);display:block;margin-bottom:6px;font-weight:600">SRC Mode</label>
               <select id="g-srcMode">
@@ -646,8 +646,8 @@ textarea{resize:vertical;min-height:80px}
             <div class="card-header">
               <div class="card-title"><span class="dot" style="background:var(--purple)"></span> Channel Config</div>
             </div>
-            <div style="display:flex;gap:10px">
-              <input type="text" id="adm-channel" placeholder="WhatsApp Channel Link" style="margin:0">
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <input type="text" id="adm-channel" placeholder="WhatsApp Channel Link" style="margin:0;flex:1;min-width:0">
               <button class="btn btn-primary" onclick="updateChannel()">Save</button>
             </div>
           </div>
@@ -655,7 +655,7 @@ textarea{resize:vertical;min-height:80px}
             <div class="card-header">
               <div class="card-title"><span class="dot" style="background:var(--purple)"></span> Broadcast</div>
             </div>
-            <div style="display:flex;gap:10px;margin-bottom:10px">
+            <div class="form-cols" style="margin-bottom:10px">
               <select id="bc-target" style="margin:0"><option value="all">Bot Owners</option><option value="contacts">All Contacts</option></select>
               <select id="bc-type" style="margin:0"><option value="info">Info</option><option value="warn">Warning</option><option value="alert">Alert</option></select>
             </div>

@@ -3,6 +3,14 @@
 ## Overview
 WhatsApp MD bot built with Baileys (multi-device), Express web dashboard, and SQLite database. Supports multiple bot sessions managed through a web dashboard.
 
+## Mobile Responsive Design
+- Login page (`views/login.html`) has mobile styles for screens <= 480px
+- Dashboard (`views/dashboard.html`) has comprehensive mobile breakpoints:
+  - `@media(max-width:768px)` — sidebar becomes slide-in overlay, grids collapse, compact padding
+  - `@media(max-width:400px)` — stat cards and grids go full-width single column
+- `.form-cols` CSS class is used for two-column form grids that collapse on mobile
+- Sidebar overlay (`#sidebarOverlay`) provides backdrop + close-on-tap for mobile sidebar
+
 ## Architecture
 - **Entry point:** `index.js` - Express server + Baileys WhatsApp connection manager
 - **Config:** `config.js` - Global bot settings (prefix, owner, behavior toggles)
