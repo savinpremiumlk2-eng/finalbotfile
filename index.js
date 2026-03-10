@@ -1150,6 +1150,29 @@ app.use((err, req, res, next) => {
   res.status(500).json({ success: false, message: 'Internal server error' });
 });
 
+app.get('/api/status', isAuthenticated, (req, res) => {
+  try {
+    const uptime = process.uptime();
+    const memUsage = process.memoryUsage();
+    const activeSessCount = activeSessions.size;
+    
+    res.json({
+      success: true,
+      status: 'online',
+      uptime: Math.floor(uptime),
+      uptimeFormatted: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`,
+      memory: {
+        heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024) + ' MB',
+        heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024) + ' MB'
+      },
+      activeSessions: activeSessCount,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 } // end registerRoutes
 
 process.on('SIGINT', () => {
