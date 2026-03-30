@@ -976,6 +976,19 @@ const handleMessage = async (sock, msg) => {
            return;
         }
 
+        // ── Owner-only command enforcement ────────────────────────────────────
+        // Block any command flagged ownerOnly OR in the 'owner' category from
+        // being executed by non-owners.  This is a hard gate — the individual
+        // command handler does NOT need its own check.
+        const cmdIsOwnerOnly = command.ownerOnly === true || command.category === 'owner';
+        if (cmdIsOwnerOnly && !isOwner(sender, sock)) {
+          await sock.sendMessage(from, {
+            text: `╭━━〔 👑 *OWNER ONLY* 〕━━⬣\n┃\n┃  ❌ This command is restricted.\n┃  Only the bot owner can use it.\n┃\n╰━━━━━━━━━━━━━━━━━━━━━⬣`
+          }, { quoted: msg }).catch(() => {});
+          await sock.sendMessage(from, { react: { text: '🔒', key: msg.key } }).catch(() => {});
+          return;
+        }
+
         // ── Auto-Typing / Auto-Voice ──────────────────────────────────────────
         // Start indicator now (only during actual command processing), and use
         // a refresh interval so it stays visible for slow commands (e.g. .yt).

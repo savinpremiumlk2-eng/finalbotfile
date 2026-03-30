@@ -1,6 +1,6 @@
 {
     "name": "whatsapp-md-bot",
-    "version": "2.0.0",
+    "version": "4.0.0",
     "description": "WhatsApp MD-Style Multi-Command Bot with Baileys",
     "main": "index.js",
     "type": "commonjs",
@@ -26,7 +26,7 @@
         "@vitalets/google-translate-api": "^9.2.1",
         "@whiskeysockets/baileys": "^v7.0.0-rc.9",
         "awesome-phonenumber": "^7.8.0",
-        "axios": "^1.13.6",
+        "axios": "^1.14.0",
         "baiscopelk-api": "^1.0.1",
         "better-sqlite3": "^12.8.0",
         "canvas": "^3.2.2",
